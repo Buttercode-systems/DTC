@@ -1,8 +1,8 @@
 name: Apply DTC Phase 1 blockers
 
 on:
-  push:
-    branches: [fix/phase-1-production-blockers]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
