@@ -27,5 +27,7 @@ jobs:
         run: npm run typecheck
       - name: Lint
         run: npm run lint
+      - name: Service workflow contract
+        run: npm run test:service
       - name: Production build
         run: npm run build

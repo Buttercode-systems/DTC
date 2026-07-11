@@ -8,6 +8,10 @@ import {
   recordOpsOutcome,
   requestServiceApproval,
 } from "@/app/ops/actions";
+import {
+  ClientResponseSection,
+  type ClientServiceResponse,
+} from "@/components/ops/ClientResponseSection";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Operations Console — The Admin Department" };
@@ -102,9 +106,20 @@ const SERVICES: Record<string, string> = {
 
 export default async function OperationsConsolePage() {
   const { supabase } = await requireOperator();
-  const { data, error } = await supabase.rpc("get_tad_ops_dashboard");
-  if (error) throw new Error(`Could not load TAD operations: ${error.message}`);
-  const dashboard = (data ?? EMPTY) as Dashboard;
+  const [dashboardResult, responsesResult] = await Promise.all([
+    supabase.rpc("get_tad_ops_dashboard"),
+    supabase.rpc("get_tad_client_responses"),
+  ]);
+
+  if (dashboardResult.error) {
+    throw new Error(`Could not load TAD operations: ${dashboardResult.error.message}`);
+  }
+  if (responsesResult.error) {
+    throw new Error(`Could not load client review decisions: ${responsesResult.error.message}`);
+  }
+
+  const dashboard = (dashboardResult.data ?? EMPTY) as Dashboard;
+  const clientResponses = (responsesResult.data ?? []) as ClientServiceResponse[];
   const periodEnd = johannesburgDate();
   const periodStart = johannesburgDate(addDays(new Date(), -6));
 
@@ -230,26 +245,33 @@ export default async function OperationsConsolePage() {
                       Due {action.due_date} · {action.source}
                     </p>
                   </div>
-                  <form action={recordOpsOutcome} className="grid gap-2 border border-rule bg-paper p-3">
-                    <input type="hidden" name="action_id" value={action.id} />
-                    <select name="outcome_code" className="field !py-2 text-sm" defaultValue="contacted">
-                      <option value="contacted">Contacted — awaiting answer</option>
-                      <option value="no_answer">No answer</option>
-                      <option value="follow_up">Follow up again</option>
-                      <option value="won">Won</option>
-                      <option value="lost">Lost</option>
-                      <option value="paid">Paid</option>
-                      <option value="approved">Approved</option>
-                      <option value="completed">Completed</option>
-                      <option value="not_needed">Not needed</option>
-                      <option value="other">Other</option>
-                    </select>
-                    <textarea name="outcome_note" className="field resize-y !py-2 text-sm" rows={2} placeholder="What happened?" />
-                    <div className="flex gap-2">
-                      <input name="next_action_date" type="date" className="field !py-2 text-sm" />
-                      <button className="btn-primary !px-3 !py-2 text-sm">Save</button>
-                    </div>
-                  </form>
+
+                  {action.kind === "client_approval" ? (
+                    <a href="#approvals" className="btn-primary w-full">
+                      Review approval below
+                    </a>
+                  ) : (
+                    <form action={recordOpsOutcome} className="grid gap-2 border border-rule bg-paper p-3">
+                      <input type="hidden" name="action_id" value={action.id} />
+                      <select name="outcome_code" className="field !py-2 text-sm" defaultValue="contacted">
+                        <option value="contacted">Contacted — awaiting answer</option>
+                        <option value="no_answer">No answer</option>
+                        <option value="follow_up">Follow up again</option>
+                        <option value="won">Won</option>
+                        <option value="lost">Lost</option>
+                        <option value="paid">Paid</option>
+                        <option value="approved">Approved</option>
+                        <option value="completed">Completed</option>
+                        <option value="not_needed">Not needed</option>
+                        <option value="other">Other</option>
+                      </select>
+                      <textarea name="outcome_note" className="field resize-y !py-2 text-sm" rows={2} placeholder="What happened?" />
+                      <div className="flex gap-2">
+                        <input name="next_action_date" type="date" className="field !py-2 text-sm" />
+                        <button className="btn-primary !px-3 !py-2 text-sm">Save</button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               </article>
             ))}
@@ -346,6 +368,8 @@ export default async function OperationsConsolePage() {
           </div>
         )}
       </section>
+
+      <ClientResponseSection responses={clientResponses} />
     </div>
   );
 }
