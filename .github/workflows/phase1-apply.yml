@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   apply:
@@ -23,12 +23,18 @@ jobs:
       - run: node scripts/apply-phase1.mjs
       - run: npm ci
       - run: npm run verify
-      - name: Preserve workflow for token-safe commit
-        run: git checkout HEAD -- .github/workflows/phase1-apply.yml
-      - name: Commit patched production blockers
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Fix DTC Phase 1 production blockers"
-          git push origin HEAD:fix/phase-1-production-blockers
+      - name: Upload verified Phase 1 files
+        uses: actions/upload-artifact@v4
+        with:
+          name: dtc-phase1-verified
+          retention-days: 1
+          path: |
+            lib/engine.ts
+            app/app/actions.ts
+            app/app/brief/page.tsx
+            app/app/automation/page.tsx
+            app/api/cron/owner-daily-briefs/route.ts
+            components/NavLinks.tsx
+            supabase/migrations/0010_complete_action_safely.sql
+            vercel.json
+            README.md
