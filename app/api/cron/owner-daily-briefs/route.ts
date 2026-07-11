@@ -29,7 +29,7 @@ type QueueResult = {
   sync_count?: number;
 };
 
-type AdminClient = ReturnType<typeof createClient<any>>;
+type AdminClient = ReturnType<typeof createClient>;
 
 const MONEY_KINDS = new Set([
   "invoice_chase",
