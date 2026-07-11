@@ -33,6 +33,8 @@ const KIND_LABEL: Record<string, string> = {
   recurring_invoice: "Invoice",
   manual_followup: "Follow-up",
   service_setup: "TAD setup",
+  service_workflow: "Workflow",
+  client_approval: "Decision",
   system: "Set up",
 };
 
@@ -109,21 +111,13 @@ export function TodayList({
         </p>
         <p className="mt-3 text-xs text-faint font-mono">
           Full pages:{" "}
-          <Link href="/app/leads" className="text-ledger font-semibold hover:underline">
-            Leads
-          </Link>{" "}
+          <Link href="/app/leads" className="text-ledger font-semibold hover:underline">Leads</Link>{" "}
           ·{" "}
-          <Link href="/app/quotes" className="text-ledger font-semibold hover:underline">
-            Quotes
-          </Link>{" "}
+          <Link href="/app/quotes" className="text-ledger font-semibold hover:underline">Quotes</Link>{" "}
           ·{" "}
-          <Link href="/app/invoices" className="text-ledger font-semibold hover:underline">
-            Invoices
-          </Link>{" "}
+          <Link href="/app/invoices" className="text-ledger font-semibold hover:underline">Invoices</Link>{" "}
           ·{" "}
-          <Link href="/app/import" className="text-ledger font-semibold hover:underline">
-            Import
-          </Link>
+          <Link href="/app/import" className="text-ledger font-semibold hover:underline">Import</Link>
         </p>
       </div>
     );
@@ -141,18 +135,34 @@ export function TodayList({
       {visible.length > 0 && (
         <ul className="bg-card shadow-card ruled">
           {visible.map((action) => {
-            const draft = actionDraftMessage(action);
+            const decisionAction = action.kind === "client_approval";
+            const decisionHref = action.entity_id
+              ? `/app/service#approval-${action.entity_id}`
+              : "/app/service";
+            const draft = decisionAction ? "" : actionDraftMessage(action);
             const outcomeOpen = outcomeId === action.id;
+
             return (
               <li key={action.id} className="p-4">
                 <div className="flex items-start gap-3">
-                  <button
-                    aria-label={`Mark done: ${action.title}`}
-                    onClick={() => run(action.id, () => completeAction(action.id))}
-                    className="group -mx-3 -mb-3 -mt-2.5 h-11 w-11 shrink-0 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-ledger"
-                  >
-                    <span className="h-5 w-5 border-2 border-ink group-hover:bg-ledger group-hover:border-ledger transition-colors" />
-                  </button>
+                  {decisionAction ? (
+                    <Link
+                      aria-label={`Review decision: ${action.title}`}
+                      href={decisionHref}
+                      className="group -mx-3 -mb-3 -mt-2.5 h-11 w-11 shrink-0 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-ledger"
+                    >
+                      <span className="h-5 w-5 border-2 border-slowing bg-slowing/20 group-hover:bg-slowing transition-colors" />
+                    </Link>
+                  ) : (
+                    <button
+                      aria-label={`Mark done: ${action.title}`}
+                      onClick={() => run(action.id, () => completeAction(action.id))}
+                      className="group -mx-3 -mb-3 -mt-2.5 h-11 w-11 shrink-0 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-ledger"
+                    >
+                      <span className="h-5 w-5 border-2 border-ink group-hover:bg-ledger group-hover:border-ledger transition-colors" />
+                    </button>
+                  )}
+
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <p className="font-semibold text-sm leading-snug">{action.title}</p>
@@ -161,56 +171,76 @@ export function TodayList({
                       </span>
                     </div>
                     {action.detail && <p className="mt-1 text-sm text-faint">{action.detail}</p>}
+
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono">
-                      <button
-                        type="button"
-                        onClick={() => setOutcomeId(outcomeOpen ? null : action.id)}
-                        className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-ledger font-semibold hover:underline"
-                      >
-                        {outcomeOpen ? "Close outcome" : "Record outcome →"}
-                      </button>
-                      {action.contact_phone && (
-                        <a
-                          href={whatsappLink(action.contact_phone, draft)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-ledger font-semibold hover:underline"
-                        >
-                          WhatsApp draft →
-                        </a>
+                      {decisionAction ? (
+                        <>
+                          <Link
+                            href={decisionHref}
+                            className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-ledger font-semibold hover:underline"
+                          >
+                            Review decision →
+                          </Link>
+                          <button
+                            onClick={() => run(action.id, () => snoozeAction(action.id, 1))}
+                            className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-faint hover:text-ink"
+                          >
+                            Tomorrow
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setOutcomeId(outcomeOpen ? null : action.id)}
+                            className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-ledger font-semibold hover:underline"
+                          >
+                            {outcomeOpen ? "Close outcome" : "Record outcome →"}
+                          </button>
+                          {action.contact_phone && (
+                            <a
+                              href={whatsappLink(action.contact_phone, draft)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-ledger font-semibold hover:underline"
+                            >
+                              WhatsApp draft →
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => copyDraft(action)}
+                            className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-ledger font-semibold hover:underline"
+                          >
+                            {copiedId === action.id ? "Copied" : "Copy draft"}
+                          </button>
+                          {action.contact_phone && (
+                            <a
+                              href={`tel:${action.contact_phone}`}
+                              className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-ledger font-semibold hover:underline"
+                            >
+                              Call →
+                            </a>
+                          )}
+                          <button
+                            onClick={() => run(action.id, () => snoozeAction(action.id, 1))}
+                            className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-faint hover:text-ink"
+                          >
+                            Tomorrow
+                          </button>
+                          <button
+                            onClick={() => run(action.id, () => dismissAction(action.id))}
+                            className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-faint hover:text-ink"
+                          >
+                            Not needed
+                          </button>
+                        </>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => copyDraft(action)}
-                        className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-ledger font-semibold hover:underline"
-                      >
-                        {copiedId === action.id ? "Copied" : "Copy draft"}
-                      </button>
-                      {action.contact_phone && (
-                        <a
-                          href={`tel:${action.contact_phone}`}
-                          className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-ledger font-semibold hover:underline"
-                        >
-                          Call →
-                        </a>
-                      )}
-                      <button
-                        onClick={() => run(action.id, () => snoozeAction(action.id, 1))}
-                        className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-faint hover:text-ink"
-                      >
-                        Tomorrow
-                      </button>
-                      <button
-                        onClick={() => run(action.id, () => dismissAction(action.id))}
-                        className="inline-flex items-center min-h-11 -my-2 px-2 -mx-2 text-faint hover:text-ink"
-                      >
-                        Not needed
-                      </button>
                     </div>
                   </div>
                 </div>
 
-                {outcomeOpen && (
+                {outcomeOpen && !decisionAction && (
                   <form
                     className="mt-4 ml-8 border border-rule bg-paper p-4 grid gap-3"
                     onSubmit={(event) => {
@@ -226,9 +256,7 @@ export function TodayList({
                         Outcome
                         <select name="outcome_code" className="field mt-1" defaultValue="contacted">
                           {OUTCOMES.map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
+                            <option key={value} value={value}>{label}</option>
                           ))}
                         </select>
                       </label>
