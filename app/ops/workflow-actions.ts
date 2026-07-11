@@ -14,12 +14,12 @@ function numberValue(formData: FormData, key: string, fallback: number): number 
 
 function workflowData(formData: FormData): Record<string, string | number | null> {
   const data: Record<string, string | number | null> = {};
-  for (const [key, raw] of formData.entries()) {
-    if (!key.startsWith("data.")) continue;
+  formData.forEach((raw, key) => {
+    if (!key.startsWith("data.")) return;
     const field = key.slice(5);
     const value = String(raw).trim();
     data[field] = value || null;
-  }
+  });
   return data;
 }
 
