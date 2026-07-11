@@ -157,7 +157,7 @@ export default async function ServiceDeskPage() {
       template_name: payload.template.name,
       department: payload.engagement.department,
       statuses,
-      closed_statuses: [...closed],
+      closed_statuses: Array.from(closed),
       data_warning: payload.template.config.data_warning ?? null,
       status_counts: statusCounts,
       attention_items: attentionItems,
