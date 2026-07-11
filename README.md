@@ -79,7 +79,7 @@ npm run test:smoke
 
 ## Database
 
-Apply files in `supabase/migrations/` in numerical order. The repository includes migrations `0001` through `0014`; the service foundation was applied to production in smaller audited stages matching migrations `0012` through `0014`.
+Apply files in `supabase/migrations/` in numerical order. The repository includes migrations `0001` through `0015`; the service foundation was applied to production in smaller audited stages matching migrations `0012` through `0015`.
 
 All operational tables use RLS. Assessment/report access is limited to narrow RPC functions. Today action completion and its linked-record mutation run inside one authenticated database transaction. Managed-service access is granted through explicit operator and business-membership checks.
 
