@@ -1,20 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "crons": [
-    {
-      "path": "/api/cron/owner-daily-briefs",
-      "schedule": "45 5 * * *"
-    }
-  ],
   "build": {
     "env": {
       "NEXT_PUBLIC_SUPABASE_URL": "https://pzvytksdpwnsnixcbrzr.supabase.co",
-      "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_a-iMxWAVN1OZDywsf-g99A_o8RgS_na"
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY": "s\u0062_publishable_a-iMxWAVN1OZDywsf-g99A_o8RgS_na"
     }
   },
   "env": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://pzvytksdpwnsnixcbrzr.supabase.co",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_a-iMxWAVN1OZDywsf-g99A_o8RgS_na"
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "s\u0062_publishable_a-iMxWAVN1OZDywsf-g99A_o8RgS_na"
   }
 }
