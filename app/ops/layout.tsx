@@ -21,9 +21,14 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
             >
               The Admin <span className="text-ledger">Department</span>
             </a>
-            <span className="hidden border-l border-rule pl-5 font-mono text-[10px] uppercase tracking-[0.16em] text-faint sm:inline">
-              Operations Console
-            </span>
+            <nav className="hidden items-center gap-4 border-l border-rule pl-5 text-sm sm:flex">
+              <Link href="/ops" className="font-semibold text-ink hover:text-ledger">
+                Control room
+              </Link>
+              <Link href="/ops/workflows" className="font-semibold text-ink hover:text-ledger">
+                Workflows
+              </Link>
+            </nav>
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden max-w-[20ch] truncate text-faint md:block">
@@ -37,6 +42,10 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
             </form>
           </div>
         </div>
+        <nav className="flex gap-4 border-t border-rule px-4 py-2 text-sm sm:hidden">
+          <Link href="/ops" className="font-semibold">Control room</Link>
+          <Link href="/ops/workflows" className="font-semibold">Workflows</Link>
+        </nav>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-10">{children}</main>
     </div>
