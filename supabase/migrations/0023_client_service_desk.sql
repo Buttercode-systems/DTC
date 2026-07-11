@@ -108,19 +108,12 @@ $$;
 
 create or replace function public.get_tad_client_responses()
 returns jsonb
-language plpgsql
+language sql
 security definer
 set search_path = ''
 stable
 as $$
-declare
-  v_uid uuid := auth.uid();
-begin
-  if v_uid is null or not public.is_tad_operator(v_uid) then
-    raise exception 'operator access required';
-  end if;
-
-  return coalesce((
+  select coalesce((
     select jsonb_agg(row_to_json(x) order by x.client_responded_at desc)
     from (
       select sr.id, sr.business_id, b.name as business_name,
@@ -128,12 +121,13 @@ begin
              sr.client_response_note, sr.client_responded_at
       from public.service_reports sr
       join public.businesses b on b.id = sr.business_id
-      where b.managed_by_tad and sr.client_response is not null
+      where public.is_tad_operator(auth.uid())
+        and b.managed_by_tad
+        and sr.client_response is not null
       order by sr.client_responded_at desc
       limit 30
     ) x
   ), '[]'::jsonb);
-end;
 $$;
 
 revoke all on function public.decide_client_service_approval(uuid, text, text) from public, anon;
