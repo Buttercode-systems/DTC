@@ -201,6 +201,24 @@ export function AssessmentReport({
       )}
 
       <section className="report-section">
+        <p className="eyebrow mb-1">Validate the diagnosis</p>
+        <h2 className="font-display text-2xl">Check the report against real work before changing the system</h2>
+        <div className="mt-5 grid gap-px bg-rule border border-rule sm:grid-cols-2">
+          {[
+            ["Pull a small sample", "Use 10 recent leads, quotes, jobs, invoices or admin items — never confidential data in a public tool."],
+            ["Check ownership and dates", "Confirm whether each open item really has one owner, a next action and a due date."],
+            ["Mark what was assumed", "Separate what the records prove from what was guessed or is still unknown."],
+            ["Take one baseline", "Record one current measure — response age, quote age, payment age or blocked-item count — before the fix."],
+          ].map(([title, detail]) => (
+            <div key={title} className="break-inside-avoid bg-card p-4">
+              <p className="font-semibold text-sm">{title}</p>
+              <p className="mt-1 text-sm text-faint">{detail}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="report-section">
         <p className="eyebrow mb-1">Your first Today list</p>
         <h2 className="font-display text-2xl">
           This report doesn&apos;t end here. It becomes your morning.
@@ -249,8 +267,7 @@ export function AssessmentReport({
       </section>
 
       <p className="report-footer font-mono text-xs text-faint text-center pb-6">
-        Business Execution Framework v1.0 · This report is private. Share it only
-        with people you want to see it.
+        Business Execution Framework v1.0 · This report reflects the answers supplied; it is not an independent audit. Keep it private and share it only with people you want to see it.
       </p>
     </div>
   );
