@@ -69,7 +69,6 @@ assert.ok(workflowPage.includes('data_warning'), 'workflow UI must display templ
 assert.ok(workflowIndex.includes('Configurable service workflows'), 'operator console must include a workflow portfolio');
 
 for (const fn of [
-  'get_client_service_desk',
   'decide_client_service_approval',
   'respond_to_service_report',
   'get_tad_client_responses'
@@ -77,11 +76,9 @@ for (const fn of [
   assert.ok(serviceDeskMigration.includes(`function public.${fn}`), `${fn} must exist`);
   assert.ok(serviceDeskMigration.includes(`revoke all on function public.${fn}`), `${fn} must revoke broad execution`);
 }
-assert.ok(serviceDeskMigration.includes("'can_manage'"), 'Service Desk must tell the UI whether decisions are allowed');
-assert.ok(serviceDeskMigration.includes('public.can_access_business'), 'Service Desk reads must remain business-scoped');
 assert.ok(serviceDeskMigration.includes('public.can_manage_business'), 'client decisions must require manager access');
 assert.ok(serviceDeskMigration.includes("('continue', 'change', 'stop')"), 'weekly reports must capture continue/change/stop');
-assert.ok(serviceDeskMigration.includes("wt.config->'closed_statuses'"), 'closed workflow records must stay out of attention counts');
+assert.equal(serviceDeskMigration.includes('get_client_service_desk'), false, 'Service Desk must reuse established workflow and RLS reads');
 
 for (const contract of [
   'sync_service_approval_action',
@@ -95,6 +92,15 @@ assert.ok(approvalActionMigration.includes('approval must be decided in the Serv
 
 for (const surface of ['Your Service Desk', 'Today actions', 'Open today’s actions']) {
   assert.ok(serviceDeskPage.includes(surface), `Service Desk must expose ${surface}`);
+}
+for (const readContract of [
+  'get_service_workflow',
+  'service_approvals',
+  'service_reports',
+  'can_manage_business',
+  "new Set(payload?.template.config.closed_statuses"
+]) {
+  assert.ok(serviceDeskPage.includes(readContract), `Service Desk must reuse ${readContract}`);
 }
 for (const surface of ['Approvals waiting', 'Owner or manager decision required']) {
   assert.ok(approvalSection.includes(surface), `approval surface must expose ${surface}`);
