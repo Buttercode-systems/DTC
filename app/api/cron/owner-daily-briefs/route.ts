@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { syncActiveSourcesForBusiness } from "@/lib/integrations/sync";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ type QueueResult = {
   sync_count?: number;
 };
 
-type AdminClient = ReturnType<typeof createClient>;
+type AdminClient = SupabaseClient;
 
 const MONEY_KINDS = new Set([
   "invoice_chase",
