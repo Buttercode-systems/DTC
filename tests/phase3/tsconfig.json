@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "rootDir": "../..",
+    "outDir": "../../.phase3-build"
+  },
+  "include": [
+    "../../lib/framework.ts",
+    "../../lib/scoring.ts"
+  ]
+}
