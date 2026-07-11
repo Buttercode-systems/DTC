@@ -4,9 +4,11 @@ import { ApprovalSection } from "@/components/service-desk/ApprovalSection";
 import { ReportSection } from "@/components/service-desk/ReportSection";
 import { SummaryCard } from "@/components/service-desk/Shared";
 import { WorkflowSection } from "@/components/service-desk/WorkflowSection";
-import {
-  EMPTY_SERVICE_DESK,
-  type ServiceDesk,
+import type {
+  Approval,
+  AttentionItem,
+  ServiceDesk,
+  ServiceReport,
 } from "@/components/service-desk/types";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +22,26 @@ const DEPARTMENTS: Record<string, string> = {
   practice: "Practice / Booking Admin",
   member: "Member Admin",
   core: "DueToday Core",
+};
+
+type WorkflowPayload = {
+  engagement: {
+    id: string;
+    department: string;
+    service_level: string;
+    status: string;
+    next_review_date: string | null;
+  };
+  template: {
+    key: string;
+    name: string;
+    config: {
+      statuses: string[];
+      closed_statuses: string[];
+      data_warning?: string;
+    };
+  };
+  items: AttentionItem[];
 };
 
 export default async function ServiceDeskPage() {
@@ -45,12 +67,103 @@ export default async function ServiceDeskPage() {
     );
   }
 
-  const { data, error } = await supabase.rpc("get_client_service_desk", {
-    p_business_id: business.id,
-  });
-  if (error) throw new Error(`Could not load the Service Desk: ${error.message}`);
+  const today = johannesburgDate();
+  const [workflowResult, approvalsResult, reportsResult, manageResult, actionsResult] = await Promise.all([
+    supabase.rpc("get_service_workflow", { p_business_id: business.id }),
+    supabase
+      .from("service_approvals")
+      .select("id, title, detail, amount, status, due_date, decision_note, decided_at, created_at")
+      .eq("business_id", business.id)
+      .order("created_at", { ascending: false })
+      .limit(30),
+    supabase
+      .from("service_reports")
+      .select("id, period_start, period_end, metrics, summary, status, client_response, client_response_note, client_responded_at, updated_at")
+      .eq("business_id", business.id)
+      .in("status", ["ready", "sent"])
+      .order("period_end", { ascending: false })
+      .limit(12),
+    supabase.rpc("can_manage_business", { p_business_id: business.id }),
+    supabase
+      .from("actions")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", business.id)
+      .eq("status", "open")
+      .lte("due_date", today),
+  ]);
 
-  const desk = (data ?? EMPTY_SERVICE_DESK) as ServiceDesk;
+  if (workflowResult.error && !workflowResult.error.message.includes("service engagement not found")) {
+    throw new Error(`Could not load the managed workflow: ${workflowResult.error.message}`);
+  }
+  if (approvalsResult.error) throw new Error(`Could not load approvals: ${approvalsResult.error.message}`);
+  if (reportsResult.error) throw new Error(`Could not load service reports: ${reportsResult.error.message}`);
+  if (manageResult.error) throw new Error(`Could not check decision access: ${manageResult.error.message}`);
+  if (actionsResult.error) throw new Error(`Could not count Today actions: ${actionsResult.error.message}`);
+
+  const payload = (workflowResult.data ?? null) as WorkflowPayload | null;
+  const approvals = (approvalsResult.data ?? []) as Approval[];
+  const reports = (reportsResult.data ?? []) as ServiceReport[];
+  const statuses = payload?.template.config.statuses ?? [];
+  const closed = new Set(payload?.template.config.closed_statuses ?? []);
+  const openItems = (payload?.items ?? []).filter((item) => !closed.has(item.status));
+  const blockedItems = openItems.filter((item) => Boolean(item.blocked_reason));
+  const overdueItems = openItems.filter((item) => Boolean(item.due_date && item.due_date < today));
+  const attentionItems = openItems
+    .filter((item) =>
+      Boolean(
+        item.blocked_reason ||
+        (item.due_date && item.due_date <= today) ||
+        !item.assigned_name ||
+        !item.next_action
+      )
+    )
+    .sort((a, b) => b.priority - a.priority || String(a.due_date ?? "").localeCompare(String(b.due_date ?? "")))
+    .slice(0, 40);
+  const statusCounts = statuses.reduce<Record<string, number>>((counts, status) => {
+    counts[status] = (payload?.items ?? []).filter((item) => item.status === status).length;
+    return counts;
+  }, {});
+
+  const desk: ServiceDesk = {
+    can_manage: manageResult.data === true,
+    business: {
+      id: business.id,
+      name: business.name,
+      industry: business.industry,
+      managed_by_tad: business.managed_by_tad,
+      service_status: business.service_status,
+      primary_contact_name: null,
+      primary_contact_email: null,
+    },
+    engagement: payload ? {
+      id: payload.engagement.id,
+      department: payload.engagement.department,
+      service_level: payload.engagement.service_level,
+      status: payload.engagement.status,
+      start_date: null,
+      next_review_date: payload.engagement.next_review_date,
+      template_key: payload.template.key,
+    } : null,
+    summary: {
+      pending_approvals: approvals.filter((approval) => approval.status === "pending").length,
+      open_workflow_records: openItems.length,
+      blocked_workflow_records: blockedItems.length,
+      overdue_workflow_records: overdueItems.length,
+      actions_due: actionsResult.count ?? 0,
+      reports_ready: reports.length,
+    },
+    approvals,
+    workflow: payload ? {
+      template_name: payload.template.name,
+      department: payload.engagement.department,
+      statuses,
+      closed_statuses: [...closed],
+      data_warning: payload.template.config.data_warning ?? null,
+      status_counts: statusCounts,
+      attention_items: attentionItems,
+    } : null,
+    reports,
+  };
 
   return (
     <div className="space-y-10">
@@ -108,4 +221,15 @@ export default async function ServiceDeskPage() {
       </section>
     </div>
   );
+}
+
+function johannesburgDate(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
