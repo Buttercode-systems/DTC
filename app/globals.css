@@ -43,3 +43,51 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    max-width: none;
+    overflow: visible;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .assessment-report {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .assessment-report > * + * {
+    margin-top: 28px !important;
+  }
+
+  .report-card {
+    box-shadow: none !important;
+    border: 1px solid #d8d3ca !important;
+  }
+
+  .report-section,
+  .break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .report-footer {
+    padding-bottom: 0 !important;
+  }
+
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+}
