@@ -22,7 +22,7 @@ export async function requireBusiness(): Promise<{
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  let { data: business, error } = await supabase
+  const { data: initialBusiness, error } = await supabase
     .from("businesses")
     .select(SELECT)
     .eq("owner_id", user.id)
@@ -31,6 +31,7 @@ export async function requireBusiness(): Promise<{
   // that path re-provisions or bounces a signed-in user to /signup.
   if (error) throw new Error(`Could not load your business: ${error.message}`);
 
+  let business = initialBusiness;
   if (!business) {
     // First authenticated visit (e.g. right after email confirmation):
     // provision from the metadata captured at signup.

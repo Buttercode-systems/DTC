@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || "https://dtc-xi-sable.vercel.app";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || "https://due-today-six.vercel.app";
 
 export default defineConfig({
   testDir: "./tests/smoke",
