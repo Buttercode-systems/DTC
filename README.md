@@ -123,4 +123,6 @@ Database: pzvytksdpwnsnixcbrzr
 Vercel:  due-today
 ```
 
+Git webhook verification trigger: 2026-07-11 11:43 SAST.
+
 Do not deploy from or document the retired `TheRealButter/DTC` repository or the old `duetoday` Vercel project.
