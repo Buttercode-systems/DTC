@@ -25,6 +25,7 @@ export async function createManagedBusiness(formData: FormData): Promise<void> {
   });
   if (error) throw new Error(`Could not onboard client: ${error.message}`);
   revalidatePath("/ops");
+  revalidatePath("/ops/workflows");
 }
 
 export async function openManagedBusiness(formData: FormData): Promise<void> {
@@ -45,7 +46,7 @@ export async function recordOpsOutcome(formData: FormData): Promise<void> {
   const nextDate = value(formData, "next_action_date", 20);
   if (!actionId) throw new Error("Action is required.");
 
-  const { error } = await supabase.rpc("complete_action_with_outcome", {
+  const { error } = await supabase.rpc("complete_action_with_outcome_v2", {
     p_action_id: actionId,
     p_outcome_code: outcomeCode,
     p_outcome_note: value(formData, "outcome_note", 1000) || null,
@@ -53,6 +54,8 @@ export async function recordOpsOutcome(formData: FormData): Promise<void> {
   });
   if (error) throw new Error(`Could not record action outcome: ${error.message}`);
   revalidatePath("/ops");
+  revalidatePath("/ops/workflows");
+  revalidatePath("/app");
 }
 
 export async function requestServiceApproval(formData: FormData): Promise<void> {
