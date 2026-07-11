@@ -48,36 +48,45 @@ export async function runEngine(
   const todayIso = isoDate(today);
   const derived: DerivedAction[] = [];
 
-  const [{ data: leads }, { data: quotes }, { data: invoices }, { data: promises }] =
-    await Promise.all([
-      supabase
-        .from("leads")
-        .select("id, customer_name, phone, received_at, status")
-        .eq("business_id", businessId)
-        .eq("status", "new"),
-      supabase
-        .from("quotes")
-        .select(
-          "id, number, amount, status, sent_at, valid_until, last_followup_at, customers(name, phone)"
-        )
-        .eq("business_id", businessId)
-        .in("status", ["sent"]),
-      supabase
-        .from("invoices")
-        .select(
-          "id, number, amount, kind, counterparty, status, due_date, last_chase_at, recurring_interval, next_issue_date, customers(name, phone)"
-        )
-        .eq("business_id", businessId)
-        .in("status", ["sent"]),
-      supabase
-        .from("payment_promises")
-        .select(
-          "id, promised_date, amount, kept, invoices(id, number, status, customers(name, phone))"
-        )
-        .eq("business_id", businessId)
-        .is("kept", null)
-        .lte("promised_date", todayIso),
-    ]);
+  const [leadsResult, quotesResult, invoicesResult, promisesResult] = await Promise.all([
+    supabase
+      .from("leads")
+      .select("id, customer_name, phone, received_at, status")
+      .eq("business_id", businessId)
+      .eq("status", "new"),
+    supabase
+      .from("quotes")
+      .select(
+        "id, number, amount, status, sent_at, valid_until, last_followup_at, customers(name, phone)"
+      )
+      .eq("business_id", businessId)
+      .in("status", ["sent"]),
+    supabase
+      .from("invoices")
+      .select(
+        "id, number, amount, kind, counterparty, status, due_date, last_chase_at, recurring_interval, next_issue_date, customers(name, phone)"
+      )
+      .eq("business_id", businessId)
+      .in("status", ["sent"]),
+    supabase
+      .from("payment_promises")
+      .select(
+        "id, promised_date, amount, kept, invoices(id, number, status, customers(name, phone))"
+      )
+      .eq("business_id", businessId)
+      .is("kept", null)
+      .lte("promised_date", todayIso),
+  ]);
+
+  assertQuery(leadsResult, "load leads");
+  assertQuery(quotesResult, "load quotes");
+  assertQuery(invoicesResult, "load invoices");
+  assertQuery(promisesResult, "load payment promises");
+
+  const leads = leadsResult.data;
+  const quotes = quotesResult.data;
+  const invoices = invoicesResult.data;
+  const promises = promisesResult.data;
 
   // ---- Rule 1: every new lead must be answered ---------------------------
   for (const lead of leads ?? []) {
@@ -104,10 +113,12 @@ export async function runEngine(
   for (const quote of quotes ?? []) {
     const customer = one(quote.customers);
     if (quote.valid_until && new Date(quote.valid_until + "T00:00:00") < today) {
-      await supabase
+      const expireResult = await supabase
         .from("quotes")
         .update({ status: "expired" })
-        .eq("id", quote.id);
+        .eq("id", quote.id)
+        .eq("business_id", businessId);
+      assertQuery(expireResult, "expire quote");
       derived.push({
         key: `quote_expired:${quote.id}`,
         kind: "quote_expired",
@@ -191,13 +202,15 @@ export async function runEngine(
   }
 
   // Rule 6: recurring invoices are issued on their date, never from memory.
-  const { data: recurring } = await supabase
+  const recurringResult = await supabase
     .from("invoices")
     .select("id, number, amount, recurring_interval, next_issue_date, customers(name)")
     .eq("business_id", businessId)
     .eq("recurring_interval", "monthly")
     .not("next_issue_date", "is", null)
     .lte("next_issue_date", todayIso);
+  assertQuery(recurringResult, "load recurring invoices");
+  const recurring = recurringResult.data;
 
   for (const inv of recurring ?? []) {
     const customer = one(inv.customers);
@@ -236,40 +249,50 @@ export async function runEngine(
   // Retire open actions of engine-managed kinds whose condition no longer
   // holds (lead answered elsewhere, invoice paid, quote accepted…).
   const validKeys = new Set(derived.map((d) => d.key));
-  const { data: openActions } = await supabase
+  const openActionsResult = await supabase
     .from("actions")
     .select("id, key, kind")
     .eq("business_id", businessId)
     .eq("status", "open")
     .in("kind", RECONCILED_KINDS);
+  assertQuery(openActionsResult, "load open actions");
+  const openActions = openActionsResult.data;
 
   const stale = (openActions ?? []).filter((a) => !validKeys.has(a.key));
   if (stale.length > 0) {
-    await supabase
+    const retireResult = await supabase
       .from("actions")
       .update({ status: "dismissed" })
+      .eq("business_id", businessId)
       .in(
         "id",
         stale.map((a) => a.id)
       );
+    assertQuery(retireResult, "retire stale actions");
   }
 
   // Wake snoozed actions whose snooze has lapsed and condition still holds.
-  await supabase
+  const wakeResult = await supabase
     .from("actions")
     .update({ status: "open", snoozed_until: null })
     .eq("business_id", businessId)
     .eq("status", "snoozed")
     .lte("snoozed_until", todayIso);
+  assertQuery(wakeResult, "wake snoozed actions");
 
   // Insert new actions exactly once. Existing keys keep their status
   // (done/dismissed/snoozed are respected — the engine never re-nags).
   if (derived.length > 0) {
-    await supabase.from("actions").upsert(
+    const upsertResult = await supabase.from("actions").upsert(
       derived.map((d) => ({ business_id: businessId, ...d, status: "open" })),
       { onConflict: "business_id,key", ignoreDuplicates: true }
     );
+    assertQuery(upsertResult, "create derived actions");
   }
+}
+
+function assertQuery(result: { error: { message: string } | null }, operation: string): void {
+  if (result.error) throw new Error(`Could not ${operation}: ${result.error.message}`);
 }
 
 function describeWait(hours: number): string {
