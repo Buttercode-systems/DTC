@@ -84,6 +84,10 @@ export default function AssessmentFlow() {
           <h1 className="font-display text-2xl leading-tight">
             Two things about your business, then we start.
           </h1>
+          <div className="mt-5 border border-rule bg-card p-4 text-sm text-faint leading-6">
+            <p className="font-semibold text-ink">Answer what actually happens in a normal week.</p>
+            <p className="mt-1">Use recent records where possible — not the policy, intention or software capability. If something is unknown, choose the closest conservative answer and verify it in the report.</p>
+          </div>
           <div className="mt-6">
             <p className="font-semibold mb-2">What kind of business is it?</p>
             <div className="grid grid-cols-2 gap-2">
@@ -183,7 +187,7 @@ export default function AssessmentFlow() {
                 required
                 type="email"
                 className="field"
-                placeholder="Email — your report link goes here"
+                placeholder="Email — used to identify your private report"
                 value={lead.email}
                 onChange={(e) => setLead({ ...lead, email: e.target.value })}
               />
@@ -205,7 +209,7 @@ export default function AssessmentFlow() {
               {submitting ? "Building your report…" : "Show my full report"}
             </button>
             <p className="font-mono text-xs text-faint text-center">
-              Free. No card. Your answers stay yours.
+              Your report opens immediately. Save or print the PDF. No card.
             </p>
           </form>
         </section>
@@ -238,6 +242,7 @@ function JobStep({
       <p className="font-display text-ledger">{job.verb}</p>
       <h2 className="font-display text-2xl leading-tight">{job.label}</h2>
       <p className="mt-1 text-faint text-sm">{job.question}</p>
+      <p className="mt-3 border-l-2 border-ledger pl-3 text-xs text-faint">Choose the closest answer you could defend with recent records.</p>
 
       <div className="mt-6 space-y-8">
         {questions.map((q) => {
