@@ -45,11 +45,6 @@ export default async function ServiceDeskPage() {
     );
   }
 
-  const { error: syncError } = await supabase.rpc("sync_service_workflow_actions", {
-    p_business_id: business.id,
-  });
-  if (syncError) throw new Error(`Could not refresh managed workflow actions: ${syncError.message}`);
-
   const { data, error } = await supabase.rpc("get_client_service_desk", {
     p_business_id: business.id,
   });
