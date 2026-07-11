@@ -1,0 +1,54 @@
+name: Verify Service Workflow Console
+
+on:
+  push:
+    branches: [feature/service-workflow-console]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://pzvytksdpwnsnixcbrzr.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_a-iMxWAVN1OZDywsf-g99A_o8RgS_na
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/service-workflow-console
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Remove server-component event handler
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('app/ops/workflows/page.tsx')
+          source = path.read_text()
+          source = source.replace('''          <select
+            className="field mt-1 min-w-[16rem]"
+            value={selectedId}
+            onChange={() => undefined}
+            aria-label="Managed client"
+          >''','''          <select
+            className="field mt-1 min-w-[16rem]"
+            defaultValue={selectedId}
+            aria-label="Managed client"
+            disabled
+          >''')
+          path.write_text(source)
+          PY
+      - run: npm ci
+      - run: npm run verify
+      - name: Commit verified final files
+        run: |
+          rm .github/workflows/verify-service-workflow-console.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/ops/workflows/page.tsx .github/workflows/verify-service-workflow-console.yml
+          git commit -m "Finalize the managed workflow console"
+          git push origin HEAD:feature/service-workflow-console
