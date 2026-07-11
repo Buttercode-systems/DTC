@@ -11,8 +11,6 @@ const LINKS = [
   { href: "/app/invoices", label: "Invoices" },
   { href: "/app/customers", label: "Customers" },
   { href: "/app/import", label: "Import" },
-  { href: "/app/brief", label: "Brief" },
-  { href: "/app/automation", label: "Automation" },
   { href: "/app/settings", label: "Settings" },
 ];
 

@@ -52,87 +52,20 @@ function refresh() {
 
 export async function completeAction(actionId: string): Promise<void> {
   const { supabase, businessId } = await ctx();
-  const { data: action } = await supabase
-    .from("actions")
-    .select("id, kind, entity_table, entity_id")
-    .eq("id", actionId)
-    .eq("business_id", businessId)
-    .maybeSingle();
-  if (!action) return;
+  const { data, error } = await supabase.rpc("complete_action_safely", {
+    p_action_id: actionId,
+  });
+  if (error) throw new Error(`Could not complete action: ${error.message}`);
 
-  const now = new Date().toISOString();
-  if (action.entity_id) {
-    switch (action.kind) {
-      case "lead_response":
-        await supabase
-          .from("leads")
-          .update({ status: "responded", responded_at: now })
-          .eq("id", action.entity_id)
-          .eq("status", "new");
-        break;
-      case "quote_followup":
-        await supabase.from("quotes").update({ last_followup_at: now }).eq("id", action.entity_id);
-        break;
-      case "invoice_chase":
-        await supabase.from("invoices").update({ last_chase_at: now }).eq("id", action.entity_id);
-        break;
-      case "supplier_approval":
-        await supabase.from("invoices").update({ status: "approved" }).eq("id", action.entity_id);
-        break;
-      case "recurring_invoice":
-        await issueRecurring(supabase, businessId, action.entity_id);
-        break;
-    }
-  }
+  const completed = data as { kind?: string; entity_table?: string | null } | null;
+  if (!completed?.kind) throw new Error("The action was not completed.");
 
-  await supabase
-    .from("actions")
-    .update({ status: "done", completed_at: now })
-    .eq("id", actionId)
-    .eq("business_id", businessId);
   await trackEvent(supabase, "action_completed", {
     businessId,
     path: "/app",
-    metadata: { kind: action.kind, entity_table: action.entity_table },
+    metadata: { kind: completed.kind, entity_table: completed.entity_table ?? null },
   });
   refresh();
-}
-
-async function issueRecurring(
-  supabase: SupabaseClient,
-  businessId: string,
-  templateInvoiceId: string
-): Promise<void> {
-  const { data: template } = await supabase
-    .from("invoices")
-    .select("*")
-    .eq("id", templateInvoiceId)
-    .eq("business_id", businessId)
-    .maybeSingle();
-  if (!template || !template.next_issue_date) return;
-
-  const issued = new Date(template.next_issue_date + "T00:00:00");
-  const due = new Date(issued);
-  due.setDate(due.getDate() + 7);
-  const next = new Date(issued);
-  next.setMonth(next.getMonth() + 1);
-
-  await supabase.from("invoices").insert({
-    business_id: businessId,
-    customer_id: template.customer_id,
-    kind: "customer",
-    number: `${template.number}-${isoDate(issued).slice(0, 7)}`,
-    description: template.description,
-    amount: template.amount,
-    status: "sent",
-    issued_at: isoDate(issued),
-    due_date: isoDate(due),
-  });
-
-  await supabase
-    .from("invoices")
-    .update({ next_issue_date: isoDate(next) })
-    .eq("id", templateInvoiceId);
 }
 
 export async function snoozeAction(actionId: string, days: number): Promise<void> {
