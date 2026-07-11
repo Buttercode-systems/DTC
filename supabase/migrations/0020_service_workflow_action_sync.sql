@@ -27,6 +27,14 @@ begin
           select 1 from jsonb_array_elements_text(wt.config->'closed_statuses') closed(value)
           where closed.value=wi.status
         )
+        and not exists(
+          select 1 from public.actions pending
+          where pending.business_id=wi.business_id
+            and pending.entity_table='service_work_items'
+            and pending.entity_id=wi.id
+            and pending.kind='manual_followup'
+            and pending.status in('open','snoozed')
+        )
         and (
           (wi.due_date is not null and wi.due_date<=current_date)
           or wi.blocked_reason is not null
@@ -79,6 +87,14 @@ begin
     and not exists(
       select 1 from jsonb_array_elements_text(wt.config->'closed_statuses') closed(value)
       where closed.value=wi.status
+    )
+    and not exists(
+      select 1 from public.actions pending
+      where pending.business_id=wi.business_id
+        and pending.entity_table='service_work_items'
+        and pending.entity_id=wi.id
+        and pending.kind='manual_followup'
+        and pending.status in('open','snoozed')
     )
     and (
       (wi.due_date is not null and wi.due_date<=current_date)
