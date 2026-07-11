@@ -45,7 +45,7 @@ DueToday is not a generic CRM, accounting replacement, debt-collection bot or au
 
 ## Managed service foundation
 
-The platform now supports:
+The platform supports:
 
 - secure TAD operator roles;
 - multiple managed client businesses per operator;
@@ -54,47 +54,13 @@ The platform now supports:
 - approval queues;
 - action outcomes and dated follow-ups;
 - weekly service reports;
-- owner and member access policies.
+- role-aware owner, manager, member and viewer access.
 
 The Admin Department remains the customer-facing service company. DueToday is the shared operational system used by operators and clients.
 
-## Environment setup
-
-Copy `.env.example` to `.env.local`.
-
-Core runtime requires:
-
-```text
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-```
-
-Future scheduled automation and server-side source sync require:
-
-```text
-SUPABASE_SERVICE_ROLE_KEY
-CRON_SECRET
-INTEGRATION_SECRET_KEY
-```
-
-Future Google connections require:
-
-```text
-GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET
-GOOGLE_REDIRECT_URI
-```
-
-Future email delivery requires:
-
-```text
-RESEND_API_KEY
-RESEND_FROM or DAILY_BRIEF_FROM
-```
-
-Never expose `SUPABASE_SERVICE_ROLE_KEY`, OAuth secrets, Resend keys or integration secrets through `NEXT_PUBLIC_` variables.
-
 ## Local development
+
+Use `.env.example` as the authoritative list of required and optional environment variables. Never expose administrator credentials, OAuth secrets, email-delivery keys or integration secrets through browser-visible variables.
 
 ```bash
 npm install
@@ -113,9 +79,9 @@ npm run test:smoke
 
 ## Database
 
-Apply files in `supabase/migrations/` in numerical order. Production includes migrations `0001` through `0012` after this service-delivery release is promoted.
+Apply files in `supabase/migrations/` in numerical order. The repository includes migrations `0001` through `0014`; the service foundation was applied to production in smaller audited stages matching migrations `0012` through `0014`.
 
-All operational tables use RLS. Assessment/report access is limited to narrow RPC functions. Today action completion and its linked-record mutation run inside one authenticated database transaction. Managed service access is granted through explicit operator and business-membership checks.
+All operational tables use RLS. Assessment/report access is limited to narrow RPC functions. Today action completion and its linked-record mutation run inside one authenticated database transaction. Managed-service access is granted through explicit operator and business-membership checks.
 
 ## Controlled pilot boundary
 
@@ -132,4 +98,4 @@ Database: pzvytksdpwnsnixcbrzr
 Vercel:  due-today
 ```
 
-Do not deploy from or document the retired `TheRealButter/DTC` repository or the old `duetoday` Vercel project.
+Do not deploy from or document the retired repository or the retired Vercel project.
