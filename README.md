@@ -1,24 +1,27 @@
 # DueToday
 
-Find what is stuck. Know what to do next. Keep your business moving.
+Find what is stuck. Know what to do next. Keep the business moving.
 
-DTC is the working implementation of DueToday Core: a Business Execution OS that diagnoses stuck work and turns it into clear actions due today.
+DueToday is the operational platform used by The Admin Department to run managed client workflows. It diagnoses stuck work, derives actions due today, records what happened and keeps the next commitment visible.
 
 **Production:** https://due-today-six.vercel.app  
 **Repository:** `Buttercode-systems/DTC` (`main`)  
 **Supabase:** `pzvytksdpwnsnixcbrzr`
 
-## Product flow
+## Product and service flow
 
 ```text
-Business Execution Assessment
-→ Momentum Report
-→ diagnosed stuck work
+Business Execution Assessment / TAD Admin Audit
+→ managed client workspace
+→ starting records organised
 → Today action queue
-→ daily execution rhythm
+→ recorded outcomes and next dates
+→ human approvals
+→ weekly service report
+→ workflow improvement
 ```
 
-The money-action promise remains an entry point, not the whole product. DTC must not become a generic CRM, accounting app, debt-collection tool, or autonomous messaging bot.
+DueToday is not a generic CRM, accounting replacement, debt-collection bot or autonomous messaging system. It is the shared action and control engine underneath a managed admin service.
 
 ## Stack
 
@@ -31,50 +34,33 @@ The money-action promise remains an entry point, not the whole product. DTC must
 
 - `/assessment` — Business Execution Assessment
 - `/report/[token]` — tokenized Momentum Report
-- `/app` — Today action queue
+- `/app` — active client Today action queue
 - `/app/leads`, `/app/quotes`, `/app/invoices` — source records
 - `/app/import` — CSV capture
+- `/app/report` — claimed assessment report
+- `/ops` — private TAD multi-client Operations Console
 - `/app/brief` — disabled pilot boundary page
 - `/app/automation` — disabled pilot boundary page
-- `/app/admin` — soft-launch dashboard
+- `/app/admin` — soft-launch product dashboard
 
-## Environment setup
+## Managed service foundation
 
-Copy `.env.example` to `.env.local`.
+The platform supports:
 
-Core runtime requires:
+- secure TAD operator roles;
+- multiple managed client businesses per operator;
+- active-workspace switching;
+- service engagements by department;
+- approval queues;
+- action outcomes and dated follow-ups;
+- weekly service reports;
+- role-aware owner, manager, member and viewer access.
 
-```text
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-```
-
-Future scheduled automation and server-side source sync require:
-
-```text
-SUPABASE_SERVICE_ROLE_KEY
-CRON_SECRET
-INTEGRATION_SECRET_KEY
-```
-
-Future Google connections require:
-
-```text
-GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET
-GOOGLE_REDIRECT_URI
-```
-
-Future email delivery requires:
-
-```text
-RESEND_API_KEY
-RESEND_FROM or DAILY_BRIEF_FROM
-```
-
-Never expose `SUPABASE_SERVICE_ROLE_KEY`, OAuth secrets, Resend keys, or integration secrets through `NEXT_PUBLIC_` variables.
+The Admin Department remains the customer-facing service company. DueToday is the shared operational system used by operators and clients.
 
 ## Local development
+
+Use `.env.example` as the authoritative list of required and optional environment variables. Never expose administrator credentials, OAuth secrets, email-delivery keys or integration secrets through browser-visible variables.
 
 ```bash
 npm install
@@ -89,17 +75,17 @@ npm run verify
 npm run test:smoke
 ```
 
-`npm run verify` runs TypeScript checks, ESLint and a production build. GitHub Actions runs the same gate on every pull request and every push to `main`.
+`npm run verify` runs TypeScript checks, ESLint, the evidence regression suite and a production build. GitHub Actions runs release gates on pull requests and pushes to `main`.
 
 ## Database
 
-Apply files in `supabase/migrations/` in numerical order. Production currently includes migrations `0001` through `0010`.
+Apply files in `supabase/migrations/` in numerical order. The repository includes migrations `0001` through `0015`; the service foundation was applied to production in smaller audited stages matching migrations `0012` through `0015`.
 
-All operational tables use RLS. Assessment/report access is limited to narrow RPC functions. Today action completion and its linked-record mutation run inside one authenticated database transaction.
+All operational tables use RLS. Assessment/report access is limited to narrow RPC functions. Today action completion and its linked-record mutation run inside one authenticated database transaction. Managed-service access is granted through explicit operator and business-membership checks.
 
 ## Controlled pilot boundary
 
-Scheduled briefs, source autopilot and customer delivery are intentionally disabled in production until credentials, monitoring and end-to-end delivery checks exist. The current pilot is manual-first: records feed Today actions, and the owner performs and records every external action.
+Scheduled briefs, source autopilot and customer delivery remain disabled until credentials, monitoring and end-to-end delivery checks exist. The service is manual-first: records feed Today actions, an authorised person performs the external work, and the real outcome is recorded before another action is scheduled.
 
 ## Production ownership
 
@@ -112,6 +98,4 @@ Database: pzvytksdpwnsnixcbrzr
 Vercel:  due-today
 ```
 
-Git webhook verification trigger: 2026-07-11 11:43 SAST.
-
-Do not deploy from or document the retired `TheRealButter/DTC` repository or the old `duetoday` Vercel project.
+Do not deploy from or document the retired repository or the retired Vercel project.

@@ -1,0 +1,27 @@
+import { redirect } from "next/navigation";
+import { createSupabaseServer } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+export async function requireOperator(): Promise<{
+  supabase: SupabaseClient;
+  userId: string;
+  email: string | null;
+}> {
+  const supabase = createSupabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login?next=/ops");
+
+  const { error: claimError } = await supabase.rpc("claim_first_tad_operator");
+  if (claimError) {
+    throw new Error(`Could not check initial operator access: ${claimError.message}`);
+  }
+
+  const { data: allowed, error } = await supabase.rpc("is_current_tad_operator");
+  if (error) throw new Error(`Could not verify operator access: ${error.message}`);
+  if (!allowed) redirect("/ops/denied");
+
+  return { supabase, userId: user.id, email: user.email ?? null };
+}
