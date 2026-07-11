@@ -11,8 +11,14 @@ export const metadata = { title: "Today — DueToday" };
 export default async function TodayPage() {
   const { supabase, business } = await requireBusiness();
 
-  // The engine runs every time the day is opened: derive, escalate, reconcile.
+  // Core lead-to-cash rules and installed TAD workflows both feed one Today list.
   await runEngine(supabase, business.id, business.settings);
+  const { error: workflowError } = await supabase.rpc("sync_workflow_actions", {
+    p_business_id: business.id,
+  });
+  if (workflowError) {
+    throw new Error(`Could not refresh managed workflow actions: ${workflowError.message}`);
+  }
   await trackEvent(supabase, "app_opened", { businessId: business.id, path: "/app" });
 
   const todayIso = isoDate();
