@@ -99,6 +99,9 @@ begin
 end;
 $$;
 
+revoke all on function public.sync_service_approval_action() from public, anon, authenticated;
+revoke all on function public.guard_client_approval_action_completion() from public, anon, authenticated;
+
 drop trigger if exists service_approval_action_sync on public.service_approvals;
 create trigger service_approval_action_sync
 after insert or update of status, title, detail, due_date, decision_note, decided_at, decided_by
