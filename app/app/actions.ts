@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createSupabaseServer } from "@/lib/supabase/server";
 import { isoDate } from "@/lib/format";
 import { trackEvent } from "@/lib/analytics";
 import { runEngine, type BusinessSettings } from "@/lib/engine";
 import { parseImportText, type ImportKind, type ParsedMoneyRow } from "@/lib/import-money";
 import { generateDailyBrief, sendDailyBriefEmail } from "@/lib/daily-brief";
+import { requireBusiness } from "@/lib/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 async function ctx(): Promise<{
@@ -17,22 +17,17 @@ async function ctx(): Promise<{
   settings: BusinessSettings;
   userEmail: string | null;
 }> {
-  const supabase = createSupabaseServer();
+  const { supabase, business } = await requireBusiness();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not signed in.");
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("id, name, settings")
-    .eq("owner_id", user.id)
-    .maybeSingle();
-  if (!business) throw new Error("No business found.");
+
   return {
     supabase,
     businessId: business.id,
     businessName: business.name,
-    settings: business.settings as BusinessSettings,
+    settings: business.settings,
     userEmail: user.email ?? null,
   };
 }
@@ -48,12 +43,22 @@ function refresh() {
   revalidatePath("/app/admin");
 }
 
+function assertMutation(
+  error: { message: string } | null,
+  operation: string
+): void {
+  if (error) throw new Error(`Could not ${operation}: ${error.message}`);
+}
+
 // ------------------------------------------------------- action lifecycle
 
 export async function completeAction(actionId: string): Promise<void> {
   const { supabase, businessId } = await ctx();
-  const { data, error } = await supabase.rpc("complete_action_safely", {
+  const { data, error } = await supabase.rpc("complete_action_with_outcome", {
     p_action_id: actionId,
+    p_outcome_code: "completed",
+    p_outcome_note: null,
+    p_next_action_date: null,
   });
   if (error) throw new Error(`Could not complete action: ${error.message}`);
 
@@ -63,7 +68,61 @@ export async function completeAction(actionId: string): Promise<void> {
   await trackEvent(supabase, "action_completed", {
     businessId,
     path: "/app",
-    metadata: { kind: completed.kind, entity_table: completed.entity_table ?? null },
+    metadata: {
+      kind: completed.kind,
+      entity_table: completed.entity_table ?? null,
+      outcome_code: "completed",
+    },
+  });
+  refresh();
+}
+
+export async function recordActionOutcome(formData: FormData): Promise<void> {
+  const { supabase, businessId } = await ctx();
+  const actionId = String(formData.get("action_id") ?? "");
+  const outcomeCode = String(formData.get("outcome_code") ?? "completed");
+  const note = String(formData.get("outcome_note") ?? "").trim();
+  const nextDate = String(formData.get("next_action_date") ?? "").trim();
+  const allowed = [
+    "contacted",
+    "no_answer",
+    "follow_up",
+    "won",
+    "lost",
+    "paid",
+    "approved",
+    "completed",
+    "not_needed",
+    "other",
+  ];
+
+  if (!actionId) throw new Error("Action is required.");
+  if (!allowed.includes(outcomeCode)) throw new Error("Invalid action outcome.");
+
+  const { data, error } = await supabase.rpc("complete_action_with_outcome", {
+    p_action_id: actionId,
+    p_outcome_code: outcomeCode,
+    p_outcome_note: note || null,
+    p_next_action_date: nextDate || null,
+  });
+  if (error) throw new Error(`Could not record the outcome: ${error.message}`);
+
+  const completed = data as {
+    kind?: string;
+    entity_table?: string | null;
+    next_action_date?: string | null;
+  } | null;
+  if (!completed?.kind) throw new Error("The outcome was not recorded.");
+
+  await trackEvent(supabase, "action_outcome_recorded", {
+    businessId,
+    path: "/app",
+    metadata: {
+      kind: completed.kind,
+      entity_table: completed.entity_table ?? null,
+      outcome_code: outcomeCode,
+      next_action_date: completed.next_action_date ?? null,
+    },
   });
   refresh();
 }
@@ -72,22 +131,24 @@ export async function snoozeAction(actionId: string, days: number): Promise<void
   const { supabase, businessId } = await ctx();
   const until = new Date();
   until.setDate(until.getDate() + Math.max(1, Math.min(days, 30)));
-  await supabase
+  const { error } = await supabase
     .from("actions")
     .update({ status: "snoozed", snoozed_until: isoDate(until) })
     .eq("id", actionId)
     .eq("business_id", businessId);
+  assertMutation(error, "snooze action");
   await trackEvent(supabase, "action_snoozed", { businessId, path: "/app" });
   refresh();
 }
 
 export async function dismissAction(actionId: string): Promise<void> {
   const { supabase, businessId } = await ctx();
-  await supabase
+  const { error } = await supabase
     .from("actions")
     .update({ status: "dismissed" })
     .eq("id", actionId)
     .eq("business_id", businessId);
+  assertMutation(error, "dismiss action");
   await trackEvent(supabase, "action_dismissed", { businessId, path: "/app" });
   refresh();
 }
@@ -98,7 +159,7 @@ export async function createLead(formData: FormData): Promise<void> {
   const { supabase, businessId } = await ctx();
   const name = String(formData.get("customer_name") ?? "").trim();
   if (!name) return;
-  await supabase.from("leads").insert({
+  const { error } = await supabase.from("leads").insert({
     business_id: businessId,
     customer_name: name.slice(0, 200),
     phone: str(formData, "phone"),
@@ -106,6 +167,7 @@ export async function createLead(formData: FormData): Promise<void> {
     source: str(formData, "source"),
     notes: str(formData, "notes"),
   });
+  assertMutation(error, "create lead");
   await trackEvent(supabase, "lead_created", {
     businessId,
     path: "/app/leads",
@@ -120,7 +182,12 @@ export async function setLeadStatus(leadId: string, status: string): Promise<voi
   if (!allowed.includes(status)) return;
   const patch: Record<string, unknown> = { status };
   if (status === "responded") patch.responded_at = new Date().toISOString();
-  await supabase.from("leads").update(patch).eq("id", leadId).eq("business_id", businessId);
+  const { error } = await supabase
+    .from("leads")
+    .update(patch)
+    .eq("id", leadId)
+    .eq("business_id", businessId);
+  assertMutation(error, "update lead status");
   await trackEvent(supabase, "lead_status_changed", {
     businessId,
     path: "/app/leads",
@@ -135,12 +202,13 @@ export async function createCustomer(formData: FormData): Promise<void> {
   const { supabase, businessId } = await ctx();
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;
-  await supabase.from("customers").insert({
+  const { error } = await supabase.from("customers").insert({
     business_id: businessId,
     name: name.slice(0, 200),
     phone: str(formData, "phone"),
     email: str(formData, "email"),
   });
+  assertMutation(error, "create customer");
   await trackEvent(supabase, "customer_created", { businessId, path: "/app/customers" });
   revalidatePath("/app/customers");
   refresh();
@@ -149,7 +217,7 @@ export async function createCustomer(formData: FormData): Promise<void> {
 // ------------------------------------------------------------------ quotes
 
 export async function createQuote(formData: FormData): Promise<void> {
-  const { supabase, businessId } = await ctx();
+  const { supabase, businessId, settings } = await ctx();
   const number = String(formData.get("number") ?? "").trim();
   const amount = num(formData, "amount");
   if (!number) return;
@@ -157,9 +225,9 @@ export async function createQuote(formData: FormData): Promise<void> {
   const sentAt = new Date();
   sentAt.setDate(sentAt.getDate() - Math.max(0, sentDaysAgo));
   const validUntil = new Date(sentAt);
-  validUntil.setDate(validUntil.getDate() + 30);
+  validUntil.setDate(validUntil.getDate() + settings.quote_expiry_days);
 
-  await supabase.from("quotes").insert({
+  const { error } = await supabase.from("quotes").insert({
     business_id: businessId,
     customer_id: str(formData, "customer_id"),
     number: number.slice(0, 60),
@@ -169,6 +237,7 @@ export async function createQuote(formData: FormData): Promise<void> {
     sent_at: sentAt.toISOString(),
     valid_until: isoDate(validUntil),
   });
+  assertMutation(error, "create quote");
   await trackEvent(supabase, "quote_created", {
     businessId,
     path: "/app/quotes",
@@ -180,7 +249,12 @@ export async function createQuote(formData: FormData): Promise<void> {
 export async function setQuoteStatus(quoteId: string, status: string): Promise<void> {
   const { supabase, businessId } = await ctx();
   if (!["sent", "accepted", "declined", "expired"].includes(status)) return;
-  await supabase.from("quotes").update({ status }).eq("id", quoteId).eq("business_id", businessId);
+  const { error } = await supabase
+    .from("quotes")
+    .update({ status })
+    .eq("id", quoteId)
+    .eq("business_id", businessId);
+  assertMutation(error, "update quote status");
   await trackEvent(supabase, "quote_status_changed", {
     businessId,
     path: "/app/quotes",
@@ -206,7 +280,7 @@ export async function createInvoice(formData: FormData): Promise<void> {
       })()
     : null;
 
-  await supabase.from("invoices").insert({
+  const { error } = await supabase.from("invoices").insert({
     business_id: businessId,
     customer_id: kind === "customer" ? str(formData, "customer_id") : null,
     counterparty: kind === "supplier" ? str(formData, "counterparty") : null,
@@ -219,6 +293,7 @@ export async function createInvoice(formData: FormData): Promise<void> {
     recurring_interval: recurring ? "monthly" : null,
     next_issue_date: nextIssue,
   });
+  assertMutation(error, "create invoice");
   await trackEvent(supabase, "invoice_created", {
     businessId,
     path: "/app/invoices",
@@ -229,17 +304,21 @@ export async function createInvoice(formData: FormData): Promise<void> {
 
 export async function markInvoicePaid(invoiceId: string): Promise<void> {
   const { supabase, businessId } = await ctx();
-  await supabase
+  const { error: invoiceError } = await supabase
     .from("invoices")
     .update({ status: "paid", paid_at: new Date().toISOString() })
     .eq("id", invoiceId)
     .eq("business_id", businessId);
-  await supabase
+  assertMutation(invoiceError, "mark invoice paid");
+
+  const { error: promiseError } = await supabase
     .from("payment_promises")
     .update({ kept: true })
     .eq("invoice_id", invoiceId)
     .eq("business_id", businessId)
     .is("kept", null);
+  assertMutation(promiseError, "close payment promises");
+
   await trackEvent(supabase, "invoice_paid", { businessId, path: "/app/invoices" });
   refresh();
 }
@@ -249,13 +328,14 @@ export async function recordPromise(formData: FormData): Promise<void> {
   const invoiceId = str(formData, "invoice_id");
   const promisedDate = str(formData, "promised_date");
   if (!invoiceId || !promisedDate) return;
-  await supabase.from("payment_promises").insert({
+  const { error } = await supabase.from("payment_promises").insert({
     business_id: businessId,
     invoice_id: invoiceId,
     promised_date: promisedDate,
     amount: num(formData, "amount"),
     note: str(formData, "note"),
   });
+  assertMutation(error, "record payment promise");
   await trackEvent(supabase, "payment_promise_recorded", { businessId, path: "/app/invoices" });
   refresh();
 }
@@ -270,17 +350,20 @@ export async function importMoneyItems(formData: FormData): Promise<void> {
 
   if (rows.length === 0) redirect(`/app/import?type=${kind}&imported=0&skipped=0&error=no_valid_rows`);
 
-  const [{ data: customers }, { data: existingQuotes }, { data: existingInvoices }] = await Promise.all([
+  const [customersResult, quotesResult, invoicesResult] = await Promise.all([
     supabase.from("customers").select("id, name, phone").eq("business_id", businessId).limit(1000),
     supabase.from("quotes").select("number").eq("business_id", businessId).limit(1000),
     supabase.from("invoices").select("number").eq("business_id", businessId).limit(1000),
   ]);
+  assertMutation(customersResult.error, "load customers for import");
+  assertMutation(quotesResult.error, "load quotes for import");
+  assertMutation(invoicesResult.error, "load invoices for import");
 
   const customerMap = new Map<string, string>();
-  for (const customer of customers ?? []) customerMap.set(normalizeKey(customer.name), customer.id);
+  for (const customer of customersResult.data ?? []) customerMap.set(normalizeKey(customer.name), customer.id);
 
   const existingNumbers = new Set(
-    (kind === "quotes" ? existingQuotes ?? [] : existingInvoices ?? []).map((r) => normalizeKey(r.number))
+    (kind === "quotes" ? quotesResult.data ?? [] : invoicesResult.data ?? []).map((row) => normalizeKey(row.number))
   );
 
   let imported = 0;
@@ -299,7 +382,7 @@ export async function importMoneyItems(formData: FormData): Promise<void> {
       const sentAt = sentDateFromRow(row);
       const validUntil = new Date(sentAt);
       validUntil.setDate(validUntil.getDate() + settings.quote_expiry_days);
-      await supabase.from("quotes").insert({
+      const { error } = await supabase.from("quotes").insert({
         business_id: businessId,
         customer_id: customerId,
         number: row.number,
@@ -309,8 +392,9 @@ export async function importMoneyItems(formData: FormData): Promise<void> {
         sent_at: sentAt.toISOString(),
         valid_until: isoDate(validUntil),
       });
+      assertMutation(error, `import quote ${row.number}`);
     } else {
-      await supabase.from("invoices").insert({
+      const { error } = await supabase.from("invoices").insert({
         business_id: businessId,
         customer_id: customerId,
         kind: "customer",
@@ -320,6 +404,7 @@ export async function importMoneyItems(formData: FormData): Promise<void> {
         status: "sent",
         due_date: row.dueDate,
       });
+      assertMutation(error, `import invoice ${row.number}`);
     }
 
     existingNumbers.add(key);
@@ -348,11 +433,12 @@ async function ensureCustomer(
   const cached = cache.get(key);
   if (cached) return cached;
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("customers")
     .insert({ business_id: businessId, name: row.customerName, phone: row.phone })
     .select("id")
     .single();
+  assertMutation(error, `create customer ${row.customerName}`);
 
   if (data?.id) cache.set(key, data.id);
   return data?.id ?? null;
@@ -394,7 +480,7 @@ export async function submitFeedback(formData: FormData): Promise<void> {
   const allowed = ["general", "bug", "confusing", "idea", "would_pay", "would_not_pay"];
   const rating = num(formData, "rating");
 
-  await supabase.from("soft_launch_feedback").insert({
+  const { error } = await supabase.from("soft_launch_feedback").insert({
     business_id: businessId,
     kind: allowed.includes(kind) ? kind : "general",
     rating: rating ? clamp(rating, 1, 5) : null,
@@ -402,6 +488,7 @@ export async function submitFeedback(formData: FormData): Promise<void> {
     email: str(formData, "email"),
     message: message.slice(0, 2000),
   });
+  assertMutation(error, "submit feedback");
   await trackEvent(supabase, "feedback_submitted", {
     businessId,
     path: str(formData, "page"),
@@ -423,7 +510,8 @@ export async function updateSettings(formData: FormData): Promise<void> {
   const name = String(formData.get("name") ?? "").trim();
   const patch: Record<string, unknown> = { settings };
   if (name) patch.name = name.slice(0, 200);
-  await supabase.from("businesses").update(patch).eq("id", businessId);
+  const { error } = await supabase.from("businesses").update(patch).eq("id", businessId);
+  assertMutation(error, "update business settings");
   await trackEvent(supabase, "settings_updated", { businessId, path: "/app/settings" });
   revalidatePath("/app/settings");
   refresh();
