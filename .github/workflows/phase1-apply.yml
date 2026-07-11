@@ -23,6 +23,8 @@ jobs:
       - run: node scripts/apply-phase1.mjs
       - run: npm ci
       - run: npm run verify
+      - name: Preserve workflow for token-safe commit
+        run: git checkout HEAD -- .github/workflows/phase1-apply.yml
       - name: Commit patched production blockers
         run: |
           git config user.name "github-actions[bot]"
