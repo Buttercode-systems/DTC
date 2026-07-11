@@ -1,5 +1,6 @@
 -- Return the latest assessment claimed by the signed-in user's business.
 -- Assessment tables remain closed to direct client reads.
+-- The private report token is intentionally not returned to the dashboard.
 
 create or replace function public.get_my_assessment()
 returns jsonb
@@ -9,7 +10,6 @@ set search_path = ''
 stable
 as $$
   select jsonb_build_object(
-    'token', a.token,
     'scores', a.scores,
     'industry', a.industry,
     'team_size', a.team_size,
