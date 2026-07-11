@@ -34,8 +34,8 @@ The money-action promise remains an entry point, not the whole product. DTC must
 - `/app` — Today action queue
 - `/app/leads`, `/app/quotes`, `/app/invoices` — source records
 - `/app/import` — CSV capture
-- `/app/brief` — owner daily brief
-- `/app/automation` — settings and source connections
+- `/app/brief` — disabled pilot boundary page
+- `/app/automation` — disabled pilot boundary page
 - `/app/admin` — soft-launch dashboard
 
 ## Environment setup
@@ -49,7 +49,7 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 ```
 
-Scheduled automation and server-side source sync additionally require:
+Future scheduled automation and server-side source sync require:
 
 ```text
 SUPABASE_SERVICE_ROLE_KEY
@@ -57,7 +57,7 @@ CRON_SECRET
 INTEGRATION_SECRET_KEY
 ```
 
-Google connections additionally require:
+Future Google connections require:
 
 ```text
 GOOGLE_CLIENT_ID
@@ -65,7 +65,7 @@ GOOGLE_CLIENT_SECRET
 GOOGLE_REDIRECT_URI
 ```
 
-Email delivery additionally requires:
+Future email delivery requires:
 
 ```text
 RESEND_API_KEY
@@ -93,24 +93,13 @@ npm run test:smoke
 
 ## Database
 
-Apply files in `supabase/migrations/` in numerical order. Production currently includes migrations `0001` through `0009`.
+Apply files in `supabase/migrations/` in numerical order. Production currently includes migrations `0001` through `0010`.
 
-All operational tables use RLS. Assessment/report access is limited to narrow RPC functions. Customer-facing automation remains approval-first by default.
+All operational tables use RLS. Assessment/report access is limited to narrow RPC functions. Today action completion and its linked-record mutation run inside one authenticated database transaction.
 
-## Automation safety defaults
+## Controlled pilot boundary
 
-```text
-customer_message_mode = draft_only
-require_approval_for_customer_messages = true
-approved_send_enabled = false
-autopilot_enabled = false
-```
-
-Automation order:
-
-```text
-capture → detection → action creation → draft/brief → approval → send/log
-```
+Scheduled briefs, source autopilot and customer delivery are intentionally disabled in production until credentials, monitoring and end-to-end delivery checks exist. The current pilot is manual-first: records feed Today actions, and the owner performs and records every external action.
 
 ## Production ownership
 
