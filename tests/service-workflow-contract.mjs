@@ -10,9 +10,13 @@ const update = read('supabase/migrations/0019_service_workflow_update.sql');
 const sync = read('supabase/migrations/0020_service_workflow_action_sync.sql');
 const outcome = read('supabase/migrations/0021_service_workflow_outcome_trigger.sql');
 const reporting = read('supabase/migrations/0022_service_workflow_reporting.sql');
+const serviceDeskMigration = read('supabase/migrations/0023_client_service_desk.sql');
 const workflowPage = read('app/ops/client/[businessId]/page.tsx');
 const workflowActions = read('app/ops/workflow-actions.ts');
 const workflowIndex = read('app/ops/workflows/page.tsx');
+const serviceDeskPage = read('app/app/service/page.tsx');
+const serviceDeskActions = read('app/app/service/actions.ts');
+const nav = read('components/NavLinks.tsx');
 
 for (const table of [
   'service_workflow_templates',
@@ -73,4 +77,31 @@ for (const control of [
 assert.ok(workflowPage.includes('data_warning'), 'workflow UI must display template data warnings');
 assert.ok(workflowIndex.includes('Managed client workflows'), 'operator console must include a workflow portfolio');
 
-console.log('Configurable service workflow contract passed.');
+for (const fn of [
+  'get_client_service_desk',
+  'decide_client_service_approval',
+  'respond_to_service_report'
+]) {
+  assert.ok(serviceDeskMigration.includes(`function public.${fn}`), `${fn} must exist`);
+  assert.ok(serviceDeskMigration.includes(`revoke all on function public.${fn}`), `${fn} must revoke broad execution`);
+}
+assert.ok(serviceDeskMigration.includes('public.can_access_business'), 'Service Desk reads must remain business-scoped');
+assert.ok(serviceDeskMigration.includes('public.can_manage_business'), 'client decisions must require manager access');
+assert.ok(serviceDeskMigration.includes("('continue', 'change', 'stop')"), 'weekly reports must capture continue/change/stop');
+
+for (const surface of [
+  'Your Service Desk',
+  'Approvals waiting',
+  'Workflow visibility',
+  'Service reports',
+  'Continue',
+  'Change the workflow',
+  'Stop'
+]) {
+  assert.ok(serviceDeskPage.includes(surface), `Service Desk must expose ${surface}`);
+}
+assert.ok(serviceDeskActions.includes('decide_client_service_approval'), 'client approval action must use the scoped RPC');
+assert.ok(serviceDeskActions.includes('respond_to_service_report'), 'client report response must use the scoped RPC');
+assert.ok(nav.includes('/app/service'), 'client navigation must expose the Service Desk');
+
+console.log('Configurable service workflow and client Service Desk contract passed.');
