@@ -27,5 +27,7 @@ jobs:
         run: npm run typecheck
       - name: Lint
         run: npm run lint
+      - name: Managed-service contracts
+        run: npm run test:service
       - name: Production build
         run: npm run build
