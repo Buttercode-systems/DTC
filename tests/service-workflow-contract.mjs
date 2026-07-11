@@ -89,6 +89,14 @@ for (const contract of [
   assert.ok(approvalActionMigration.includes(contract), `approval action loop must include ${contract}`);
 }
 assert.ok(approvalActionMigration.includes('approval must be decided in the Service Desk'), 'generic completion must not bypass approval');
+assert.ok(
+  approvalActionMigration.includes('revoke all on function public.sync_service_approval_action() from public, anon, authenticated'),
+  'approval sync trigger function must not be directly executable'
+);
+assert.ok(
+  approvalActionMigration.includes('revoke all on function public.guard_client_approval_action_completion() from public, anon, authenticated'),
+  'approval guard trigger function must not be directly executable'
+);
 
 for (const surface of ['Your Service Desk', 'Today actions', 'Open today’s actions']) {
   assert.ok(serviceDeskPage.includes(surface), `Service Desk must expose ${surface}`);
