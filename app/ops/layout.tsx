@@ -1,9 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { signOut } from "@/app/signup/actions";
-import { requireOperator } from "@/lib/operator";
+import { createSupabaseServer } from "@/lib/supabase/server";
 
 export default async function OpsLayout({ children }: { children: React.ReactNode }) {
-  const { email } = await requireOperator();
+  const supabase = createSupabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login?next=/ops");
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -21,7 +26,9 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
             </span>
           </div>
           <div className="flex items-center gap-3 text-sm">
-            <span className="hidden max-w-[20ch] truncate text-faint md:block">{email}</span>
+            <span className="hidden max-w-[20ch] truncate text-faint md:block">
+              {user.email}
+            </span>
             <Link href="/app" className="text-ledger font-semibold hover:underline">
               DueToday
             </Link>
