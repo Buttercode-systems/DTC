@@ -7,7 +7,7 @@ const end = source.indexOf("\nasync function testManagedRouteRestrictions", star
 if (start < 0 || end < 0) throw new Error("Could not locate clientDecisionAndReport");
 
 const replacement = `async function switchClientWorkspace(page, businessId) {
-  await page.goto(\\`\${appUrl}/app/service\\`, { waitUntil: "networkidle" });
+  await page.goto(\`\${appUrl}/app/service\`, { waitUntil: "networkidle" });
   const switcher = page.getByLabel("Client workspace");
   if ((await switcher.count()) === 0) return;
   if ((await switcher.inputValue()) !== businessId) {
