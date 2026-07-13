@@ -33,5 +33,7 @@ jobs:
         run: npm run test:pilot
       - name: TAD application pipeline contract
         run: npm run test:intake
+      - name: Managed lifecycle contract
+        run: npm run test:lifecycle
       - name: Production build
         run: npm run build
