@@ -3,6 +3,8 @@ name: Temporary Production Operator E2E
 on:
   push:
     branches: [fix/operator-bootstrap-and-e2e]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
