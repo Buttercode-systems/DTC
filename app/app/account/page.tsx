@@ -14,7 +14,7 @@ export default async function ManagedAccountPage() {
         <p className="eyebrow">Client Portal</p>
         <h1 className="mt-2 font-display text-4xl">Account and service access</h1>
         <p className="mt-3 max-w-2xl text-faint leading-7">
-          This portal is the client-facing view of your managed service. The Admin Department operates the detailed workflow while your authorised people keep control of decisions.
+          Managed by The Admin Department. This portal is the client-facing view of your service while TAD operates the detailed workflow and your authorised people keep control of decisions.
         </p>
       </section>
 
