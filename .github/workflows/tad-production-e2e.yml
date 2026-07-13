@@ -1,0 +1,38 @@
+name: Live TAD Operator and Client E2E
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  live-role-e2e:
+    if: contains(github.event.pull_request.title, '[live-e2e]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      E2E_APP_URL: https://due-today-git-feature-full-production-5884b8-ramatsies-projects.vercel.app
+      E2E_TAD_URL: https://the-admin-department.vercel.app
+      NEXT_PUBLIC_SUPABASE_URL: https://pzvytksdpwnsnixcbrzr.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_a-iMxWAVN1OZDywsf-g99A_o8RgS_na
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run live operator and client journey
+        run: node tests/tad-live-role-e2e.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tad-live-role-e2e-${{ github.run_id }}
+          path: test-results/tad-live-e2e
+          if-no-files-found: warn
+          retention-days: 14
