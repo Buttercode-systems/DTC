@@ -47,7 +47,7 @@ for (const phrase of [
   'R4,900',
   'Managed Follow-up',
   'R3,900 per month',
-  'launch price hypothesis',
+  'Launch price hypothesis',
 ]) {
   assert.ok(files.offer.includes(phrase), `offer must include ${phrase}`);
 }
