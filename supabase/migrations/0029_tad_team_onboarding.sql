@@ -25,11 +25,11 @@ begin
   set status = 'revoked'
   where business_id = p_business_id and lower(email) = v_email and status = 'pending';
 
-  v_token := encode(gen_random_bytes(32),'hex');
+  v_token := encode(extensions.gen_random_bytes(32),'hex');
   insert into public.workspace_invitations(
     business_id,email,role,token_hash,status,invited_by,expires_at
   ) values (
-    p_business_id,v_email,p_role,encode(digest(v_token,'sha256'),'hex'),'pending',v_uid,now() + interval '7 days'
+    p_business_id,v_email,p_role,encode(extensions.digest(v_token,'sha256'),'hex'),'pending',v_uid,now() + interval '7 days'
   ) returning * into v_invitation;
 
   return jsonb_build_object(
@@ -60,7 +60,7 @@ begin
 
   select * into v_invitation
   from public.workspace_invitations
-  where token_hash = encode(digest(trim(coalesce(p_token,'')),'sha256'),'hex')
+  where token_hash = encode(extensions.digest(trim(coalesce(p_token,'')),'sha256'),'hex')
     and status = 'pending'
   for update;
 
