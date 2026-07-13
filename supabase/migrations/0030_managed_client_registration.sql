@@ -5,7 +5,8 @@
 
 alter table public.managed_client_invitations
   add column if not exists registration_attempts integer not null default 0,
-  add column if not exists last_registration_attempt_at timestamptz;
+  add column if not exists last_registration_attempt_at timestamptz,
+  add column if not exists updated_at timestamptz not null default now();
 
 alter table public.managed_client_invitations
   drop constraint if exists managed_client_invitations_registration_attempts_check;
