@@ -23,5 +23,16 @@ export async function GET(request: NextRequest) {
   verify.searchParams.set("token", token);
   verify.searchParams.set("type", "signup");
   verify.searchParams.set("redirect_to", redirectTo);
-  return NextResponse.redirect(verify);
+
+  const response = await fetch(verify, {
+    method: "GET",
+    redirect: "manual",
+    headers: { "User-Agent": "TAD preview E2E confirmation relay" },
+  });
+  const location = response.headers.get("location") ?? "";
+  const ok = response.status >= 300 && response.status < 400 && !location.includes("error=");
+  return NextResponse.json(
+    { ok, status: response.status, redirected_to_login: location.includes("/login") },
+    { status: ok ? 200 : 400, headers: { "Cache-Control": "no-store" } }
+  );
 }
