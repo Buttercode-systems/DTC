@@ -26,13 +26,16 @@ export function JoinManagedClientForm({
           name="passphrase"
           type="password"
           required
-          minLength={8}
+          minLength={12}
+          maxLength={128}
           autoComplete="new-password"
-          placeholder="At least 8 characters"
+          placeholder="12+ characters with upper-case, lower-case and a number"
         />
       </label>
+      <p className="text-xs leading-5 text-faint">
+        The private invitation delivered to this email verifies the account. No separate confirmation email is required.
+      </p>
       {state.error && <p className="border border-stuck/40 bg-stuck/10 p-3 text-sm text-stuck">{state.error}</p>}
-      {state.notice && <p className="border border-ledger/40 bg-ledger/5 p-3 text-sm text-ledger">{state.notice}</p>}
       <JoinButton />
     </form>
   );
