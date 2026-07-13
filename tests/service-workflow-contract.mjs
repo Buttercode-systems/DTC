@@ -98,18 +98,20 @@ assert.ok(
   'approval guard trigger function must not be directly executable'
 );
 
-for (const surface of ['Your Service Desk', 'Today actions', 'Open today’s actions']) {
+for (const surface of ['Approvals and reports', 'All active workflows', 'Open unified Today']) {
   assert.ok(serviceDeskPage.includes(surface), `Service Desk must expose ${surface}`);
 }
 for (const readContract of [
-  'get_service_workflow',
+  'get_tad_department_center',
+  'get_tad_unified_today',
   'service_approvals',
   'service_reports',
-  'can_manage_business',
-  "new Set(payload?.template.config.closed_statuses"
+  'can_manage_business'
 ]) {
   assert.ok(serviceDeskPage.includes(readContract), `Service Desk must reuse ${readContract}`);
 }
+assert.ok(serviceDeskPage.includes('delivery_mode === "managed"'), 'Service Desk must distinguish Managed departments');
+assert.ok(serviceDeskPage.includes('delivery_mode === "self_service"'), 'Service Desk must distinguish SaaS departments');
 for (const surface of ['Approvals waiting', 'Owner or manager decision required']) {
   assert.ok(approvalSection.includes(surface), `approval surface must expose ${surface}`);
 }
@@ -122,6 +124,6 @@ assert.ok(todayList.includes('Review decision →'), 'Today must route approval 
 assert.ok(todayList.includes('client_approval'), 'Today must identify protected approval actions');
 assert.ok(opsPage.includes('get_tad_client_responses'), 'operator console must load client review decisions');
 assert.ok(opsPage.includes('action.kind === "client_approval"'), 'operators must not complete approvals as generic outcomes');
-assert.ok(nav.includes('/app/service'), 'client navigation must expose the Service Desk');
+assert.ok(nav.includes('/app/service'), 'client navigation must expose approvals and reports');
 
-console.log('Configurable service workflow and client Service Desk contract passed.');
+console.log('Configurable multi-department workflow and client control-room contract passed.');

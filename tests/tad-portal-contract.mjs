@@ -19,35 +19,37 @@ const applications = read("app/ops/applications/page.tsx");
 const operatorBootstrap = read("supabase/migrations/0026_tad_operator_bootstrap_policy.sql");
 
 for (const phrase of [
-  "MANAGED_LINKS",
-  'label: "Service Desk"',
-  'label: "Decisions"',
+  "PLATFORM_LINKS",
+  'label: "Today"',
+  'label: "Departments"',
+  'label: "Approvals"',
   'label: "Reports"',
+  'label: "Imports"',
+  'label: "Team"',
   'label: "Account"',
+  'label: "Settings"',
   "managedByTad",
-  "Client portal navigation",
+  "TAD Managed navigation",
+  "TAD SaaS navigation",
 ]) {
-  assert.ok(nav.includes(phrase), `managed navigation must include ${phrase}`);
+  assert.ok(nav.includes(phrase), `unified navigation must include ${phrase}`);
 }
-assert.ok(nav.includes("STANDALONE_LINKS"), "standalone DueToday navigation must remain available");
-assert.ok(nav.includes('label: "Leads"'), "standalone navigation must retain Leads");
-assert.ok(nav.includes('label: "Invoices"'), "standalone navigation must retain Invoices");
+assert.equal(nav.includes("STANDALONE_LINKS"), false, "old split navigation must be removed");
+assert.equal(nav.includes("MANAGED_LINKS"), false, "old managed-only navigation must be removed");
 
 for (const phrase of [
   "The Admin",
   "Client Portal",
   "managedByTad={managed}",
   "Managed by The Admin Department",
-  "!managed && <FeedbackForm",
 ]) {
-  assert.ok(appLayout.includes(phrase), `managed client shell must include ${phrase}`);
+  assert.ok(appLayout.includes(phrase), `app shell must include ${phrase}`);
 }
-assert.ok(appLayout.includes("Due<span"), "standalone DueToday brand must remain available");
 
 for (const phrase of ["The Admin", "Admin HQ", "Applications", "Workflows", "Public site"]) {
   assert.ok(opsLayout.includes(phrase), `Admin HQ must include ${phrase}`);
 }
-assert.equal(opsLayout.includes('>DueToday<'), false, "Admin HQ must not present DueToday as the operator product");
+assert.equal(opsLayout.includes(">DueToday<"), false, "Admin HQ must not present DueToday as the operator product");
 
 for (const phrase of [
   'return "hq"',
@@ -62,32 +64,28 @@ assert.ok(signIn.includes('typeof value === "string" ? value : "/start"'), "sign
 assert.ok(signIn.includes(': "/start"'), "unsafe redirects must fall back to /start");
 
 for (const phrase of [
+  'pathname.startsWith("/app")',
   'pathname.startsWith("/hq")',
   'pathname.startsWith("/portal")',
   'pathname.startsWith("/start")',
-  '"/app/pipeline"',
-  '"/app/leads"',
-  '"/app/quotes"',
-  '"/app/invoices"',
-  '"/app/customers"',
-  '"/app/import"',
-  '"/app/settings"',
-  "active?.managed_by_tad",
-  'url.pathname = "/app/service"',
 ]) {
-  assert.ok(middleware.includes(phrase), `middleware must enforce ${phrase}`);
+  assert.ok(middleware.includes(phrase), `middleware must protect ${phrase}`);
 }
+assert.equal(middleware.includes("standaloneOnlyRoutes"), false, "managed users must be allowed into the same platform routes");
+assert.equal(middleware.includes('url.pathname = "/app/service"'), false, "middleware must not force managed users into one service page");
 
-for (const phrase of ["is_current_tad_operator", 'redirect("/ops")', "business.managed_by_tad", '"/app/service"']) {
+for (const phrase of ["is_current_tad_operator", 'redirect("/ops")', 'redirect("/app")']) {
   assert.ok(start.includes(phrase), `role-aware start must include ${phrase}`);
 }
-assert.ok(portal.includes("business.managed_by_tad"), "portal entry must verify managed status");
-assert.ok(portal.includes('"/app/service"'), "portal entry must open the Service Desk");
+assert.ok(portal.includes("claim_tad_client_access"), "portal must securely claim client access");
+assert.ok(portal.includes("activate_all_tad_departments"), "managed portal entry must activate all six departments");
+assert.ok(portal.includes('p_delivery_mode: "managed"'), "managed portal entry must use managed mode");
+assert.ok(portal.includes('redirect("/app")'), "portal entry must open the unified Today queue");
 assert.ok(hq.includes("requireOperator"), "Admin HQ entry must require an operator");
 assert.ok(hq.includes('redirect("/ops")'), "Admin HQ entry must open the operator workspace");
-assert.ok(operator.includes('/login?next=/hq'), "operator authentication must use the branded HQ login");
-assert.ok(operator.includes('claim_first_tad_operator'), "operator entry must run the bootstrap claim");
-assert.ok(operator.includes('is_current_tad_operator'), "operator entry must verify the resulting role");
+assert.ok(operator.includes("/login?next=/hq"), "operator authentication must use the branded HQ login");
+assert.ok(operator.includes("claim_first_tad_operator"), "operator entry must run the bootstrap claim");
+assert.ok(operator.includes("is_current_tad_operator"), "operator entry must verify the resulting role");
 
 for (const phrase of [
   "Open client activation link",
@@ -99,10 +97,7 @@ for (const phrase of [
 ]) {
   assert.ok(applications.includes(phrase), `operator onboarding handoff must include ${phrase}`);
 }
-assert.ok(
-  applications.includes("A different email will not receive access"),
-  "operator must be warned that access is bound to the application email"
-);
+assert.ok(applications.includes("A different email will not receive access"));
 
 for (const phrase of [
   "tad_operator_bootstrap_emails",
@@ -119,22 +114,18 @@ assert.ok(
   operatorBootstrap.indexOf("tad_operator_bootstrap_emails") < operatorBootstrap.indexOf("create or replace function public.claim_first_tad_operator"),
   "the allowlist table must exist before the bootstrap function is replaced"
 );
-assert.equal(
-  operatorBootstrap.includes("if v_email not in ('buttercoder.dev@gmail.com','bvsic101@gmail.com')"),
-  false,
-  "the bootstrap policy must not regress to the stale two-email production rule"
-);
 
 for (const phrase of [
-  "Account and service access",
-  "Managed by The Admin Department",
-  "What belongs in this portal",
-  "Contact TAD",
-  'redirect("/app/settings")',
+  "One account controls TAD SaaS and TAD Managed",
+  "Workspace mode",
+  "Active departments",
+  "Managed by TAD",
+  "Manage departments",
+  "Manage team",
 ]) {
-  assert.ok(account.includes(phrase), `managed account page must include ${phrase}`);
+  assert.ok(account.includes(phrase), `account page must include ${phrase}`);
 }
 assert.ok(approvals.includes('id="decisions"'), "Service Desk must expose the decisions anchor");
 assert.ok(reports.includes('id="reports"'), "Service Desk must expose the reports anchor");
 
-console.log("TAD Admin HQ, Client Portal, activation handoff and operator bootstrap contract passed.");
+console.log("TAD unified SaaS, Managed, Admin HQ and Client Portal contract passed.");

@@ -47,7 +47,9 @@ export async function signUp(
     email,
     password,
     options: {
-      emailRedirectTo: tadMode ? `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://due-today-six.vercel.app"}/auth/callback?next=/portal` : undefined,
+      emailRedirectTo: tadMode
+        ? `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://due-today-six.vercel.app"}/auth/callback?next=/portal`
+        : `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://due-today-six.vercel.app"}/auth/callback?next=/app/departments`,
       data: {
         business_name: businessName.slice(0, 200),
         assessment_token: assessmentToken.slice(0, 64),
@@ -70,7 +72,7 @@ export async function signUp(
     return {
       notice: tadMode
         ? "Check your email to confirm your account, then sign in to the TAD Client Portal with this same email address."
-        : "Check your email to confirm your account, then sign in — your Today list will be waiting.",
+        : "Check your email to confirm your account. All six TAD departments will be ready when you sign in.",
     };
   }
 
@@ -87,11 +89,24 @@ export async function signUp(
     redirect(next.startsWith("/portal") ? next : "/portal");
   }
 
-  await supabase.rpc("provision_my_business", {
+  const { error: provisionError } = await supabase.rpc("provision_my_business", {
     p_business_name: businessName,
     p_assessment_token: assessmentToken || null,
   });
-  redirect(next);
+  if (provisionError) return { error: `Could not create your workspace: ${provisionError.message}` };
+
+  const { data: businesses, error: businessesError } = await supabase.rpc("list_accessible_businesses");
+  if (businessesError) return { error: `Could not open your workspace: ${businessesError.message}` };
+  const business = (businesses as Array<{ id: string }> | null)?.[0];
+  if (!business) return { error: "Workspace creation completed without an accessible business." };
+
+  const { error: activateError } = await supabase.rpc("activate_all_tad_departments", {
+    p_business_id: business.id,
+    p_delivery_mode: "self_service",
+  });
+  if (activateError) return { error: `Workspace created but departments could not be activated: ${activateError.message}` };
+
+  redirect(next === "/app" ? "/app/departments" : next);
 }
 
 export async function signIn(

@@ -9,37 +9,26 @@ type NavItem = {
   anchor?: boolean;
 };
 
-const STANDALONE_LINKS: NavItem[] = [
+const PLATFORM_LINKS: NavItem[] = [
   { href: "/app", label: "Today" },
-  { href: "/app/service", label: "Service" },
-  { href: "/app/report", label: "Report" },
-  { href: "/app/pipeline", label: "Pipeline" },
-  { href: "/app/leads", label: "Leads" },
-  { href: "/app/quotes", label: "Quotes" },
-  { href: "/app/invoices", label: "Invoices" },
-  { href: "/app/customers", label: "Customers" },
-  { href: "/app/import", label: "Import" },
-  { href: "/app/settings", label: "Settings" },
-];
-
-const MANAGED_LINKS: NavItem[] = [
-  { href: "/app", label: "Today" },
-  { href: "/app/service", label: "Service Desk" },
-  { href: "/app/service#decisions", label: "Decisions", anchor: true },
+  { href: "/app/departments", label: "Departments" },
+  { href: "/app/service#decisions", label: "Approvals", anchor: true },
   { href: "/app/service#reports", label: "Reports", anchor: true },
+  { href: "/app/import", label: "Imports" },
+  { href: "/app/team", label: "Team" },
   { href: "/app/account", label: "Account" },
+  { href: "/app/settings", label: "Settings" },
 ];
 
 export function NavLinks({ managedByTad = false }: { managedByTad?: boolean }) {
   const pathname = usePathname();
-  const links = managedByTad ? MANAGED_LINKS : STANDALONE_LINKS;
 
   return (
     <nav
       className="flex items-center gap-4 text-sm whitespace-nowrap min-w-max sm:min-w-0"
-      aria-label={managedByTad ? "Client portal navigation" : "App navigation"}
+      aria-label={managedByTad ? "TAD Managed navigation" : "TAD SaaS navigation"}
     >
-      {links.map((link) => {
+      {PLATFORM_LINKS.map((link) => {
         const active = link.anchor
           ? false
           : link.href === "/app"
