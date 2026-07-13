@@ -52,10 +52,7 @@ export async function importDepartmentCsv(formData: FormData): Promise<void> {
   if (parsed.length < 2) throw new Error("CSV must include a header row and at least one record");
 
   const headers = parsed[0].map((header) => header.trim());
-  const required = new Set(["title"]);
-  for (const name of required) {
-    if (!headers.includes(name)) throw new Error(`Missing required column: ${name}`);
-  }
+  if (!headers.includes("title")) throw new Error("Missing required column: title");
 
   const rows = parsed.slice(1, 1001).map((values) => {
     const row: Record<string, unknown> = { data: {} as Record<string, string> };
