@@ -25,11 +25,13 @@ test.describe("API and protected route smoke", () => {
     expect([200, 404]).toContain(response?.status());
     await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible();
     await expect(page.locator("body")).toContainText(/not found|could not be found/i);
-    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    await expect(page.locator('head meta[name="robots"]').first()).toHaveAttribute(
       "content",
       /noindex/i
     );
-    await expect(page.locator("main, body")).not.toContainText(/execution report|invoice|customer|lead details/i);
+    await expect(page.locator("body")).not.toContainText(
+      /execution report|invoice|customer|lead details/i
+    );
   });
 
   for (const route of ["/app", "/app/import", "/app/automation", "/app/admin"]) {
