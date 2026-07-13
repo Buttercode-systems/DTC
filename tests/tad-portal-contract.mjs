@@ -15,6 +15,7 @@ const hq = read("app/hq/page.tsx");
 const account = read("app/app/account/page.tsx");
 const approvals = read("components/service-desk/ApprovalSection.tsx");
 const reports = read("components/service-desk/ReportSection.tsx");
+const applications = read("app/ops/applications/page.tsx");
 const operatorBootstrap = read("supabase/migrations/0026_tad_operator_bootstrap_policy.sql");
 
 for (const phrase of [
@@ -89,6 +90,21 @@ assert.ok(operator.includes('claim_first_tad_operator'), "operator entry must ru
 assert.ok(operator.includes('is_current_tad_operator'), "operator entry must verify the resulting role");
 
 for (const phrase of [
+  "Open client activation link",
+  "Creating the workspace does not automatically email the client",
+  "Send this activation link only after scope and payment are confirmed",
+  'next: "/portal"',
+  "application.email",
+  "application.business_name",
+]) {
+  assert.ok(applications.includes(phrase), `operator onboarding handoff must include ${phrase}`);
+}
+assert.ok(
+  applications.includes("A different email will not receive access"),
+  "operator must be warned that access is bound to the application email"
+);
+
+for (const phrase of [
   "tad_operator_bootstrap_emails",
   "ramatsienkoanyane07@gmail.com",
   "select lower(trim(email))",
@@ -121,4 +137,4 @@ for (const phrase of [
 assert.ok(approvals.includes('id="decisions"'), "Service Desk must expose the decisions anchor");
 assert.ok(reports.includes('id="reports"'), "Service Desk must expose the reports anchor");
 
-console.log("TAD Admin HQ, Client Portal and operator bootstrap contract passed.");
+console.log("TAD Admin HQ, Client Portal, activation handoff and operator bootstrap contract passed.");

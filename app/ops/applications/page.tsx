@@ -110,6 +110,17 @@ const DECISION_OPTIONS = [
   ["declined", "Declined"],
 ] as const;
 
+const PORTAL_BASE = "https://due-today-six.vercel.app";
+
+function clientActivationUrl(application: Application): string {
+  const params = new URLSearchParams({
+    next: "/portal",
+    email: application.email,
+    business: application.business_name,
+  });
+  return `${PORTAL_BASE}/signup?${params.toString()}`;
+}
+
 export default async function ApplicationsPage() {
   const { supabase } = await requireOperator();
   const { data, error } = await supabase.rpc("list_tad_applications");
@@ -125,7 +136,7 @@ export default async function ApplicationsPage() {
             Applications
           </h1>
           <p className="mt-3 max-w-3xl text-faint leading-7">
-            Review qualification facts, record the commercial decision and create the correct private DueToday department workspace only after an application is qualified.
+            Review qualification facts, record the commercial decision and create the correct private managed workspace only after an application is qualified. Creating the workspace does not automatically email the client; use the activation link shown after onboarding.
           </p>
         </div>
         <a
@@ -158,6 +169,7 @@ export default async function ApplicationsPage() {
               DEPARTMENT_LABELS[application.department] ?? application.department;
             const offerPath =
               OFFER_PATHS[application.department] ?? "admin-systems.html";
+            const activationUrl = clientActivationUrl(application);
             return (
               <article key={application.id} className="border border-rule bg-card p-5 sm:p-6">
                 <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
@@ -230,12 +242,26 @@ export default async function ApplicationsPage() {
                     </form>
 
                     {application.managed_business_id ? (
-                      <Link
-                        href={`/ops/client/${application.managed_business_id}`}
-                        className="btn-primary mt-3 w-full text-center"
-                      >
-                        Open managed workspace
-                      </Link>
+                      <div className="mt-3 space-y-3">
+                        <Link
+                          href={`/ops/client/${application.managed_business_id}`}
+                          className="btn-primary w-full text-center"
+                        >
+                          Open managed workspace
+                        </Link>
+                        <a
+                          href={activationUrl}
+                          className="btn-secondary w-full text-center"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open client activation link
+                        </a>
+                        <div className="border border-rule bg-paper p-3 text-xs leading-5 text-faint">
+                          <strong className="block text-ink">Client Portal handoff</strong>
+                          Send this activation link only after scope and payment are confirmed. The client must register with <span className="font-mono text-ink">{application.email}</span>. A different email will not receive access.
+                        </div>
+                      </div>
                     ) : application.status === "qualified" ? (
                       <form action={startTadApplicationOnboarding} className="mt-3">
                         <input type="hidden" name="application_id" value={application.id} />
