@@ -17,6 +17,6 @@ export default async function PortalEntryPage() {
     throw new Error(`Could not activate Client Portal access: ${claimError.message}`);
   }
 
-  const { business } = await requireBusiness();
-  redirect(business.managed_by_tad ? "/app/service" : "/app");
+  await requireBusiness();
+  redirect("/app");
 }
