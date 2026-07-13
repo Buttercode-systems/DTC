@@ -1,0 +1,1 @@
+record_type,external_reference,customer_name,contact_name,email,phone,service_requested,received_date,quote_date,quote_value,currency,current_status,assigned_owner,next_action,next_action_due,last_contact_date,last_contact_outcome,blocked_reason,source,notes

@@ -29,5 +29,7 @@ jobs:
         run: npm run lint
       - name: Service workflow contract
         run: npm run test:service
+      - name: Pilot launch pack contract
+        run: npm run test:pilot
       - name: Production build
         run: npm run build
