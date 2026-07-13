@@ -43,5 +43,5 @@ for each row execute function public.guard_tad_application_intake();
 -- The multi-department endpoint replaced the original Sales-only public RPC.
 -- Keep the function for migration compatibility, but remove it from the API.
 revoke all on function public.submit_tad_application(
-  text,text,text,text,integer,text,text,text,boolean,boolean,boolean,text,text
+  text,text,text,integer,text,text,text,boolean,boolean,boolean,text,text
 ) from public, anon, authenticated;
