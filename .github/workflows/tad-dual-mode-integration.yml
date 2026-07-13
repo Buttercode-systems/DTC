@@ -1,0 +1,56 @@
+name: TAD SaaS and Managed Integration
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dual-mode-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Install dependencies
+        run: npm ci
+      - name: Initialize isolated Supabase stack
+        shell: bash
+        run: |
+          if [ ! -f supabase/config.toml ]; then
+            supabase init
+          fi
+          if [ -f supabase/migrations/0024_tad_application_pipeline.sql ]; then
+            mv supabase/migrations/0024_tad_application_pipeline.sql supabase/migrations/002401_tad_application_pipeline.sql
+          fi
+          mkdir -p test-results
+          set -o pipefail
+          supabase start --debug 2>&1 | tee test-results/supabase-start.log
+      - name: Test SaaS, Managed and hybrid journeys
+        shell: bash
+        run: |
+          supabase status -o env > /tmp/tad-supabase.env
+          set -a
+          source /tmp/tad-supabase.env
+          set +a
+          node tests/tad-dual-mode-integration.mjs 2>&1 | tee test-results/tad-dual-mode-integration.log
+      - name: Upload integration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tad-dual-mode-integration-${{ github.run_id }}
+          path: test-results/
+          if-no-files-found: warn
+      - name: Stop isolated Supabase stack
+        if: always()
+        run: supabase stop --no-backup
