@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(path, "utf8");
 const migration = read("supabase/migrations/0027_client_access_and_commercial_gates.sql");
 const previewHardening = read("supabase/migrations/0028_harden_client_invitation_preview.sql");
+const registrationMigration = read("supabase/migrations/0030_managed_client_registration.sql");
+const registrationFunction = read("supabase/functions/managed-client-register/index.ts");
 const applications = read("app/ops/applications/page.tsx");
 const applicationActions = read("app/ops/applications/actions.ts");
 const accessActions = read("app/ops/client/[businessId]/access/actions.ts");
@@ -11,6 +13,7 @@ const accessSection = read("app/ops/client/[businessId]/access/ClientAccessSecti
 const acceptPage = read("app/portal/accept/page.tsx");
 const acceptAction = read("app/portal/accept/actions.ts");
 const joinPage = read("app/portal/join/page.tsx");
+const joinForm = read("app/portal/join/JoinManagedClientForm.tsx");
 const joinAction = read("app/portal/join/actions.ts");
 const signin = read("app/auth/signin/route.ts");
 const callback = read("app/auth/callback/route.ts");
@@ -105,6 +108,66 @@ assert.ok(
 assert.ok(accessActions.includes("cache: \"no-store\""), "invitation delivery must never be cached");
 
 for (const phrase of [
+  "registration_attempts",
+  "registration_attempt_limit_reached",
+  "reserve_managed_client_registration",
+  "claim_managed_client_invitation_for_user",
+  "auth.role() <> 'service_role'",
+  "auth_user_email_mismatch",
+  "managed_business_not_found",
+  "to service_role",
+]) {
+  assert.ok(registrationMigration.includes(phrase), `verified registration migration must include ${phrase}`);
+}
+assert.ok(
+  registrationMigration.includes("registration_attempts >= 10"),
+  "each invitation must have a non-bypassable registration attempt cap"
+);
+assert.ok(
+  registrationMigration.includes("from public, anon, authenticated"),
+  "registration RPCs must be unavailable to public and user roles"
+);
+assert.ok(
+  registrationMigration.indexOf("select lower(trim(email)) into v_auth_email") <
+    registrationMigration.indexOf("insert into public.business_memberships"),
+  "the Auth user email must be verified before membership is granted"
+);
+
+for (const phrase of [
+  "SUPABASE_SECRET_KEYS",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "reserve_managed_client_registration",
+  "auth.admin.createUser",
+  "email_confirm: true",
+  "claim_managed_client_invitation_for_user",
+  "auth.admin.deleteUser",
+  "signInWithPassword",
+  "Cache-Control",
+  "no-store",
+]) {
+  assert.ok(registrationFunction.includes(phrase), `registration function must include ${phrase}`);
+}
+assert.ok(
+  registrationFunction.indexOf("reserve_managed_client_registration") <
+    registrationFunction.indexOf("auth.admin.createUser"),
+  "the one-time invitation must be reserved before an Auth user is created"
+);
+assert.ok(
+  registrationFunction.indexOf("claim_managed_client_invitation_for_user") <
+    registrationFunction.indexOf("signInWithPassword"),
+  "workspace access must be claimed before a session is returned"
+);
+assert.ok(
+  registrationFunction.indexOf("claimError") < registrationFunction.indexOf("auth.admin.deleteUser"),
+  "a failed workspace claim must remove the newly created Auth user"
+);
+assert.equal(
+  registrationFunction.includes("console.log"),
+  false,
+  "the registration function must not log invitation tokens, passwords or sessions"
+);
+
+for (const phrase of [
   "Join {invitation.business_name}",
   "Sign in",
   "Create client account",
@@ -112,7 +175,7 @@ for (const phrase of [
 ]) {
   assert.ok(acceptPage.includes(phrase), `invitation acceptance page must include ${phrase}`);
 }
-assert.ok(acceptAction.includes("claim_managed_client_invitation"), "client acceptance must claim the invitation");
+assert.ok(acceptAction.includes("claim_managed_client_invitation"), "existing clients must claim the invitation after sign-in");
 assert.ok(acceptAction.includes('redirect("/app/service")'), "accepted clients must land in the Service Desk");
 
 for (const phrase of [
@@ -122,9 +185,24 @@ for (const phrase of [
 ]) {
   assert.ok(joinPage.includes(phrase), `managed signup page must include ${phrase}`);
 }
-assert.ok(joinAction.includes("managed-signup:"), "managed signup must be rate limited");
-assert.ok(joinAction.includes("emailRedirectTo"), "managed signup confirmation must return to the invitation");
-assert.ok(joinAction.includes("claim_managed_client_invitation"), "immediate signup sessions must claim access");
+for (const phrase of [
+  "minLength={12}",
+  "maxLength={128}",
+  "No separate confirmation email is required",
+]) {
+  assert.ok(joinForm.includes(phrase), `managed signup form must include ${phrase}`);
+}
+for (const phrase of [
+  "managed-signup:",
+  "/functions/v1/managed-client-register",
+  "cache: \"no-store\"",
+  "supabase.auth.setSession",
+  'redirect("/app/service")',
+]) {
+  assert.ok(joinAction.includes(phrase), `managed registration action must include ${phrase}`);
+}
+assert.equal(joinAction.includes("auth.signUp"), false, "managed client registration must not depend on the default Auth mailer");
+assert.equal(joinAction.includes("emailRedirectTo"), false, "managed client registration must not wait for a confirmation email");
 assert.equal(joinAction.includes("provision_my_business"), false, "managed client signup must never provision a standalone business");
 
 for (const source of [signin, callback]) {
@@ -139,4 +217,4 @@ assert.ok(middleware.includes("request.nextUrl.search"), "protected redirects mu
 assert.ok(opsLayout.includes('href="/ops/access"'), "Admin HQ must expose client access management");
 assert.ok(serviceLayout.includes("Service Desk — The Admin Department"), "managed portal metadata must use TAD branding");
 
-console.log("Managed service commercial, invitation, delivery and auth lifecycle contract passed.");
+console.log("Managed service commercial, invitation, delivery, verified registration and auth lifecycle contract passed.");
