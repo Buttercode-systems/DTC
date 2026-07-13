@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(path, "utf8");
 const baseMigration = read("supabase/migrations/0024_tad_application_pipeline.sql");
 const departmentMigration = read("supabase/migrations/0025_multi_department_tad_applications.sql");
+const lifecycleMigration = read("supabase/migrations/0027_client_access_and_commercial_gates.sql");
 const endpoint = read("app/api/tad/applications/route.ts");
 const page = read("app/ops/applications/page.tsx");
 const actions = read("app/ops/applications/actions.ts");
@@ -72,14 +73,26 @@ for (const phrase of [
   "Operational records never enter this public intake queue",
   "qualification_notes",
   "commercial_decision",
+  "payment_status",
+  "scope_accepted",
+  "Workspace locked until all gates pass",
   "DEPARTMENT_LABELS",
   "OFFER_PATHS",
 ]) {
   assert.ok(page.includes(phrase), `operator inbox must include ${phrase}`);
 }
 
-assert.ok(actions.includes("update_tad_application"), "review action must use the audited RPC");
+for (const phrase of [
+  "review_tad_application",
+  "commercial_acceptance_required",
+  "payment_confirmation_required",
+  "scope_acceptance_required",
+]) {
+  assert.ok(lifecycleMigration.includes(phrase), `commercial lifecycle migration must include ${phrase}`);
+}
+assert.ok(actions.includes("review_tad_application"), "review action must use the gated audited RPC");
 assert.ok(actions.includes("start_tad_application_onboarding"), "onboarding action must use the audited RPC");
 assert.ok(layout.includes('href="/ops/applications"'), "operator navigation must link to applications");
+assert.ok(layout.includes('href="/ops/access"'), "operator navigation must link to client access");
 
-console.log("Multi-department TAD application pipeline contract passed.");
+console.log("Multi-department TAD application and commercial gate contract passed.");
