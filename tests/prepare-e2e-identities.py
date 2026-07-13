@@ -10,9 +10,9 @@ from pathlib import Path
 import bcrypt
 
 run_id = re.sub(r"[^A-Za-z0-9_-]", "", os.environ.get("E2E_RUN_ID", ""))
-job_secret = os.environ.get("E2E_JOB_SECRET", "")
+job_secret = os.environ.get("E2E_JOB_SECRET") or os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "")
 if not run_id or not job_secret:
-    raise RuntimeError("E2E_RUN_ID and E2E_JOB_SECRET are required")
+    raise RuntimeError("E2E_RUN_ID and GitHub OIDC entropy are required")
 
 
 def derive_password(role: str, prefix: str) -> str:
