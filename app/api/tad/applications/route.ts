@@ -6,14 +6,44 @@ export const dynamic = "force-dynamic";
 
 const PRODUCTION_ORIGIN = "https://the-admin-department.vercel.app";
 const MAX_BODY_BYTES = 12_000;
+
+const DEPARTMENTS = {
+  invoice: "Invoice Admin",
+  sales: "Sales Admin",
+  client: "Client Admin",
+  property: "Property Admin",
+  practice: "Practice / Booking Admin",
+  member: "Member Admin",
+} as const;
+
 const ALLOWED_PROBLEMS = new Set([
   "missed",
   "ownership",
   "next_action",
   "visibility",
   "reporting",
+  "missing_information",
+  "approval_delay",
+  "duplicates",
+  "filing",
+  "missing_documents",
+  "onboarding_delay",
+  "handover",
+  "lost_requests",
+  "supplier_delay",
+  "scheduling",
+  "completion_proof",
+  "booking_gaps",
+  "confirmation_gaps",
+  "no_show_followup",
+  "attendance_risk",
+  "payment_followup",
+  "churn_risk",
+  "reactivation",
   "none",
 ]);
+
+type Department = keyof typeof DEPARTMENTS;
 
 function allowedOrigin(origin: string | null): boolean {
   if (!origin) return true;
@@ -49,13 +79,17 @@ function validEmail(value: string): boolean {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
 }
 
-function requestFingerprint(request: Request, email: string): string {
+function isDepartment(value: string): value is Department {
+  return Object.prototype.hasOwnProperty.call(DEPARTMENTS, value);
+}
+
+function requestFingerprint(request: Request, email: string, department: Department): string {
   const forwarded = clean(request.headers.get("x-forwarded-for"), 300)
     .split(",")[0]
     .trim();
   const userAgent = clean(request.headers.get("user-agent"), 500);
   return createHash("sha256")
-    .update(`${forwarded}|${userAgent}|${email.toLowerCase()}|tad-sales-admin-v1`)
+    .update(`${forwarded}|${userAgent}|${email.toLowerCase()}|${department}|tad-admin-v2`)
     .digest("hex");
 }
 
@@ -113,24 +147,31 @@ export async function POST(request: Request): Promise<Response> {
     return json(origin, { ok: false, error: "invalid_form_session" }, 400);
   }
 
+  const department = clean(payload.department || "sales", 30);
   const businessName = clean(payload.business, 160);
   const contactName = clean(payload.contact, 160);
   const email = clean(payload.email, 320).toLowerCase();
   const activeRecords = Number(payload.active_records);
-  const followUpProblem = clean(payload.follow_up_problem, 80);
+  const workflowProblem = clean(
+    payload.workflow_problem || payload.follow_up_problem,
+    80
+  );
   const currentTools = clean(payload.tools, 300);
   const requiredOutcome = clean(payload.outcome, 700);
   const ownerAvailable = payload.owner_available === true;
   const dataAuthority = payload.data_authority === true;
   const boundaryAccepted = payload.boundary_accepted === true;
 
+  if (!isDepartment(department)) {
+    return json(origin, { ok: false, error: "invalid_department" }, 400);
+  }
   if (businessName.length < 2 || contactName.length < 2 || !validEmail(email)) {
     return json(origin, { ok: false, error: "invalid_contact_details" }, 400);
   }
   if (!Number.isInteger(activeRecords) || activeRecords < 0 || activeRecords > 10_000) {
     return json(origin, { ok: false, error: "invalid_active_records" }, 400);
   }
-  if (!ALLOWED_PROBLEMS.has(followUpProblem) || requiredOutcome.length < 5) {
+  if (!ALLOWED_PROBLEMS.has(workflowProblem) || requiredOutcome.length < 5) {
     return json(origin, { ok: false, error: "invalid_qualification_details" }, 400);
   }
   if (!ownerAvailable || !dataAuthority || !boundaryAccepted) {
@@ -146,21 +187,23 @@ export async function POST(request: Request): Promise<Response> {
   const supabase = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const fingerprint = requestFingerprint(request, email);
+  const fingerprint = requestFingerprint(request, email, department);
+  const departmentLabel = DEPARTMENTS[department];
 
-  const { data, error } = await supabase.rpc("submit_tad_application", {
+  const { data, error } = await supabase.rpc("submit_tad_department_application", {
+    p_department: department,
     p_business_name: businessName,
     p_contact_name: contactName,
     p_email: email,
     p_active_records: activeRecords,
-    p_follow_up_problem: followUpProblem,
+    p_workflow_problem: workflowProblem,
     p_current_tools: currentTools || null,
     p_required_outcome: requiredOutcome,
     p_owner_available: ownerAvailable,
     p_data_authority: dataAuthority,
     p_boundary_accepted: boundaryAccepted,
     p_request_fingerprint: fingerprint,
-    p_source: "sales_admin_offer",
+    p_source: `${department}_admin_offer`,
   });
 
   if (error) {
@@ -172,6 +215,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const result = data as {
     id?: string;
+    department?: string;
     duplicate?: boolean;
     readiness_ready?: boolean;
   } | null;
@@ -185,24 +229,25 @@ export async function POST(request: Request): Promise<Response> {
     const applicantText = [
       `Hi ${contactName},`,
       "",
-      "We received your Sales Admin application.",
+      `We received your ${departmentLabel} application.`,
       `Reference: ${reference}`,
       "",
-      "The Admin Department will review the workflow facts you supplied. No customer lead or quote records were submitted through the public form.",
+      "The Admin Department will review the workflow facts you supplied. No customer, supplier, tenant, patient, member or other operational records were submitted through the public form.",
       "",
       "Important decisions and any later use of operational records remain subject to explicit scope, authority and human approval.",
       "",
       "The Admin Department",
     ].join("\n");
     const operatorText = [
-      "NEW TAD SALES ADMIN APPLICATION",
+      `NEW TAD ${departmentLabel.toUpperCase()} APPLICATION`,
       "",
       `Reference: ${reference}`,
+      `Department: ${departmentLabel}`,
       `Business: ${businessName}`,
       `Contact: ${contactName}`,
       `Email: ${email}`,
-      `Active leads/quotes: ${activeRecords}`,
-      `Problem: ${followUpProblem}`,
+      `Active workflow records: ${activeRecords}`,
+      `Problem: ${workflowProblem}`,
       `Tools: ${currentTools || "Not supplied"}`,
       `Required outcome: ${requiredOutcome}`,
       `Ready by public rules: ${result?.readiness_ready ? "Yes" : "No"}`,
@@ -214,12 +259,12 @@ export async function POST(request: Request): Promise<Response> {
     [acknowledgementSent, operatorNotificationSent] = await Promise.all([
       sendEmail({
         to: email,
-        subject: `Sales Admin application received — ${reference}`,
+        subject: `${departmentLabel} application received — ${reference}`,
         text: applicantText,
       }).catch(() => false),
       sendEmail({
         to: notifyTo,
-        subject: `New Sales Admin application — ${businessName}`,
+        subject: `New ${departmentLabel} application — ${businessName}`,
         text: operatorText,
       }).catch(() => false),
     ]);
@@ -231,6 +276,7 @@ export async function POST(request: Request): Promise<Response> {
       ok: true,
       received: true,
       reference,
+      department,
       duplicate,
       email_delivery: {
         acknowledgement: acknowledgementSent,

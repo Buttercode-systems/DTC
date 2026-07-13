@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(path, "utf8");
-const migration = read("supabase/migrations/0024_tad_application_pipeline.sql");
+const baseMigration = read("supabase/migrations/0024_tad_application_pipeline.sql");
+const departmentMigration = read("supabase/migrations/0025_multi_department_tad_applications.sql");
 const endpoint = read("app/api/tad/applications/route.ts");
 const page = read("app/ops/applications/page.tsx");
 const actions = read("app/ops/applications/actions.ts");
@@ -18,12 +19,27 @@ for (const phrase of [
   "rate_limit_exceeded",
   "operators read TAD applications",
 ]) {
-  assert.ok(migration.includes(phrase), `migration must include ${phrase}`);
+  assert.ok(baseMigration.includes(phrase), `base migration must include ${phrase}`);
 }
 
-assert.ok(migration.includes("to anon, authenticated"), "submission RPC must be callable by the public intake");
-assert.ok(migration.includes("application_must_be_qualified"), "workspace creation must require qualification");
-assert.ok(migration.includes("public.create_managed_business"), "onboarding must reuse the managed workspace function");
+for (const department of ["invoice", "sales", "client", "property", "practice", "member"]) {
+  assert.ok(departmentMigration.includes(`'${department}'`), `department migration must support ${department}`);
+  assert.ok(endpoint.includes(`${department}:`), `endpoint must label ${department}`);
+  assert.ok(page.includes(`${department}:`), `operator inbox must label ${department}`);
+}
+
+for (const phrase of [
+  "submit_tad_department_application",
+  "tad_applications_department_check",
+  "tad_applications_workflow_problem_check",
+  "department = p_department",
+  "v_application.department",
+  "public.create_managed_business",
+  "application_must_be_qualified",
+  "to anon, authenticated",
+]) {
+  assert.ok(departmentMigration.includes(phrase), `department migration must include ${phrase}`);
+}
 
 for (const phrase of [
   "origin_not_allowed",
@@ -32,7 +48,9 @@ for (const phrase of [
   "company_website",
   "required_confirmations_missing",
   "requestFingerprint",
-  "submit_tad_application",
+  "submit_tad_department_application",
+  "workflow_problem",
+  "invalid_department",
   "too_many_requests",
   "RESEND_API_KEY",
   "/ops/applications",
@@ -41,22 +59,27 @@ for (const phrase of [
 }
 
 assert.ok(
-  endpoint.indexOf('supabase.rpc("submit_tad_application"') < endpoint.indexOf("sendEmail({"),
+  endpoint.indexOf('supabase.rpc("submit_tad_department_application"') < endpoint.indexOf("sendEmail({"),
   "email delivery must happen after database storage"
 );
+assert.ok(endpoint.includes('payload.department || "sales"'), "Sales clients remain backwards compatible");
+assert.ok(endpoint.includes("payload.workflow_problem || payload.follow_up_problem"), "old Sales payload remains accepted");
 
 for (const phrase of [
-  "Applications",
+  "Managed admin intake",
   "list_tad_applications",
-  "Create Sales Admin workspace",
-  "Customer lead and quote records never enter this public intake queue",
+  "Create {departmentLabel} workspace",
+  "Operational records never enter this public intake queue",
   "qualification_notes",
   "commercial_decision",
+  "DEPARTMENT_LABELS",
+  "OFFER_PATHS",
 ]) {
   assert.ok(page.includes(phrase), `operator inbox must include ${phrase}`);
 }
+
 assert.ok(actions.includes("update_tad_application"), "review action must use the audited RPC");
 assert.ok(actions.includes("start_tad_application_onboarding"), "onboarding action must use the audited RPC");
 assert.ok(layout.includes('href="/ops/applications"'), "operator navigation must link to applications");
 
-console.log("Secure TAD application pipeline contract passed.");
+console.log("Multi-department TAD application pipeline contract passed.");
