@@ -16,9 +16,6 @@ jobs:
     env:
       E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
       E2E_APP_URL: http://127.0.0.1:4175
-      E2E_PROXY_PORT: 4175
-      E2E_PREVIEW_ORIGIN: https://due-today-git-feature-full-production-5884b8-ramatsies-projects.vercel.app
-      E2E_SHARE_URL: https://due-today-git-feature-full-production-5884b8-ramatsies-projects.vercel.app/?_vercel_share=LjQ6Tyi6sJCzphCSuMuCAx7baiDi7tOr
       E2E_TAD_URL: https://the-admin-department.vercel.app
       NEXT_PUBLIC_SUPABASE_URL: https://pzvytksdpwnsnixcbrzr.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_a-iMxWAVN1OZDywsf-g99A_o8RgS_na
@@ -29,23 +26,34 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Prepare hash-only operator invitation bootstrap
+        run: node tests/prepare-registration-bootstrap.mjs
+      - name: Publish invitation hash for controlled provisioning
+        uses: actions/upload-artifact@v4
+        with:
+          name: tad-e2e-registration-bootstrap-${{ github.run_id }}
+          path: test-results/tad-live-e2e/registration-bootstrap-public.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Build exact pull-request application
+        run: npm run build
       - run: npx playwright install --with-deps chromium
-      - name: Start protected-preview proxy
+      - name: Start exact pull-request application
         run: |
-          node tests/vercel-preview-proxy.mjs > /tmp/tad-preview-proxy.log 2>&1 &
-          echo $! > /tmp/tad-preview-proxy.pid
+          npm run start -- -p 4175 > /tmp/tad-local-app.log 2>&1 &
+          echo $! > /tmp/tad-local-app.pid
           for attempt in {1..60}; do
-            if curl --fail --silent http://127.0.0.1:4175/__health >/dev/null; then exit 0; fi
+            if curl --fail --silent http://127.0.0.1:4175/login >/dev/null; then exit 0; fi
             sleep 1
           done
-          cat /tmp/tad-preview-proxy.log
+          cat /tmp/tad-local-app.log
           exit 1
       - name: Prepare live journey
         run: node tests/prepare-live-role-e2e.mjs
       - name: Run live operator and client journey
         run: node tests/tad-live-role-e2e.mjs
       - if: failure()
-        run: cat /tmp/tad-preview-proxy.log || true
+        run: cat /tmp/tad-local-app.log || true
       - if: always()
         uses: actions/upload-artifact@v4
         with:
