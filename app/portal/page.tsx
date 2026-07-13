@@ -17,6 +17,16 @@ export default async function PortalEntryPage() {
     throw new Error(`Could not activate Client Portal access: ${claimError.message}`);
   }
 
-  await requireBusiness();
+  const { business } = await requireBusiness();
+  if (business.managed_by_tad) {
+    const { error: activateError } = await supabase.rpc("activate_all_tad_departments", {
+      p_business_id: business.id,
+      p_delivery_mode: "managed",
+    });
+    if (activateError) {
+      throw new Error(`Could not activate managed departments: ${activateError.message}`);
+    }
+  }
+
   redirect("/app");
 }
