@@ -15,7 +15,9 @@ jobs:
     timeout-minutes: 45
     env:
       E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
-      E2E_APP_URL: https://due-today-git-feature-full-production-5884b8-ramatsies-projects.vercel.app
+      E2E_APP_URL: http://127.0.0.1:4175
+      E2E_PROXY_PORT: 4175
+      E2E_PREVIEW_ORIGIN: https://due-today-git-feature-full-production-5884b8-ramatsies-projects.vercel.app
       E2E_SHARE_URL: https://due-today-git-feature-full-production-5884b8-ramatsies-projects.vercel.app/?_vercel_share=0TktBUI8b71tmLQnJji9hjb0R6IADe6D
       E2E_TAD_URL: https://the-admin-department.vercel.app
       NEXT_PUBLIC_SUPABASE_URL: https://pzvytksdpwnsnixcbrzr.supabase.co
@@ -28,8 +30,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Start protected-preview proxy
+        run: |
+          node tests/vercel-preview-proxy.mjs > /tmp/tad-preview-proxy.log 2>&1 &
+          echo $! > /tmp/tad-preview-proxy.pid
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:4175/__health >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/tad-preview-proxy.log
+          exit 1
       - name: Run live operator and client journey
-        run: node --import ./tests/e2e-vercel-share-loader.mjs tests/tad-live-role-e2e.mjs
+        run: node tests/tad-live-role-e2e.mjs
+      - if: failure()
+        run: cat /tmp/tad-preview-proxy.log || true
       - if: always()
         uses: actions/upload-artifact@v4
         with:
