@@ -10,6 +10,8 @@ export interface Business {
   settings: BusinessSettings;
   managed_by_tad: boolean;
   service_status: string;
+  delivery_mode?: "self_service" | "managed" | "hybrid";
+  onboarding_status?: "not_started" | "in_progress" | "ready" | "complete";
 }
 
 export type AccessibleBusiness = Business;
@@ -62,6 +64,18 @@ export async function requireBusiness(): Promise<{
       throw new Error(`Could not provision your business: ${provisionError.message}`);
     }
     businesses = await listAccessibleBusinesses(supabase);
+
+    const created = businesses[0];
+    if (created) {
+      const { error: activateError } = await supabase.rpc("activate_all_tad_departments", {
+        p_business_id: created.id,
+        p_delivery_mode: "self_service",
+      });
+      if (activateError) {
+        throw new Error(`Could not activate TAD departments: ${activateError.message}`);
+      }
+      businesses = await listAccessibleBusinesses(supabase);
+    }
   }
 
   const { data: preference, error: preferenceError } = await supabase
