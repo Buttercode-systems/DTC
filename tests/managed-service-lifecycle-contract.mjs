@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(path, "utf8");
 const migration = read("supabase/migrations/0027_client_access_and_commercial_gates.sql");
+const previewHardening = read("supabase/migrations/0028_harden_client_invitation_preview.sql");
 const applications = read("app/ops/applications/page.tsx");
 const applicationActions = read("app/ops/applications/actions.ts");
 const accessActions = read("app/ops/client/[businessId]/access/actions.ts");
@@ -65,6 +66,14 @@ assert.equal(migration.includes("token text not null"), false, "invitation beare
 assert.ok(migration.includes("token_hash text not null unique"), "only a unique token hash may be stored");
 assert.ok(migration.includes("revoke all on table public.managed_client_invitations"), "invitation table must not be directly readable");
 assert.ok(migration.includes("grant execute on function public.get_managed_client_invitation(text) to anon, authenticated"), "bearer invitation preview must use a narrow RPC");
+
+for (const phrase of ["business_name", "email", "role", "status", "expires_at"]) {
+  assert.ok(previewHardening.includes(`'${phrase}'`), `public invitation preview must include ${phrase}`);
+}
+assert.equal(previewHardening.includes("'business_id'"), false, "public invitation previews must not expose business UUIDs");
+assert.equal(previewHardening.includes("'id'"), false, "public invitation previews must not expose invitation UUIDs");
+assert.equal(previewHardening.includes("token_hash"), true, "preview lookup must still compare only a token hash");
+assert.ok(previewHardening.includes("revoke all on function public.get_managed_client_invitation"), "preview execution must be explicitly reset before narrow grants");
 
 for (const phrase of [
   "Create Client Portal invitation",
