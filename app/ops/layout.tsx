@@ -25,6 +25,9 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
               <Link href="/ops" className="font-semibold text-ink hover:text-ledger">
                 Control room
               </Link>
+              <Link href="/ops/applications" className="font-semibold text-ink hover:text-ledger">
+                Applications
+              </Link>
               <Link href="/ops/workflows" className="font-semibold text-ink hover:text-ledger">
                 Workflows
               </Link>
@@ -42,8 +45,9 @@ export default async function OpsLayout({ children }: { children: React.ReactNod
             </form>
           </div>
         </div>
-        <nav className="flex gap-4 border-t border-rule px-4 py-2 text-sm sm:hidden">
+        <nav className="flex gap-4 overflow-x-auto border-t border-rule px-4 py-2 text-sm sm:hidden">
           <Link href="/ops" className="font-semibold">Control room</Link>
+          <Link href="/ops/applications" className="font-semibold">Applications</Link>
           <Link href="/ops/workflows" className="font-semibold">Workflows</Link>
         </nav>
       </header>

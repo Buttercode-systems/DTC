@@ -31,5 +31,7 @@ jobs:
         run: npm run test:service
       - name: Pilot launch pack contract
         run: npm run test:pilot
+      - name: TAD application pipeline contract
+        run: npm run test:intake
       - name: Production build
         run: npm run build
