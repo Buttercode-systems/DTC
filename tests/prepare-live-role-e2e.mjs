@@ -10,13 +10,15 @@ function replaceOnce(before, after, label) {
 
 replaceOnce(
   'import { mkdirSync, writeFileSync } from "node:fs";',
-  'import { mkdirSync, readFileSync, writeFileSync } from "node:fs";',
+  'import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";',
   "filesystem import"
 );
 replaceOnce(
   'const operatorEmail = `ramatsienkoanyane07+tad-e2e-${runId}-operator@gmail.com`;',
   [
-    'const bootstrap = JSON.parse(readFileSync("test-results/tad-live-e2e/registration-bootstrap-private.json", "utf8"));',
+    'const bootstrapPath = "test-results/tad-live-e2e/registration-bootstrap-private.json";',
+    'const bootstrap = JSON.parse(readFileSync(bootstrapPath, "utf8"));',
+    'unlinkSync(bootstrapPath);',
     'assert.equal(bootstrap.runId, runId, "Registration bootstrap run ID must match");',
     'const operatorEmail = bootstrap.operatorEmail;',
   ].join("\n"),
