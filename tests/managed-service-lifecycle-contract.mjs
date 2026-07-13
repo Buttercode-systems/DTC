@@ -76,7 +76,9 @@ assert.equal(previewHardening.includes("token_hash"), true, "preview lookup must
 assert.ok(previewHardening.includes("revoke all on function public.get_managed_client_invitation"), "preview execution must be explicitly reset before narrow grants");
 
 for (const phrase of [
-  "Create Client Portal invitation",
+  "Create and email Client Portal invitation",
+  "Invitation emailed",
+  "Manual delivery required",
   "Copy link",
   "Deactivate access",
   "Revoke link",
@@ -84,8 +86,22 @@ for (const phrase of [
 ]) {
   assert.ok(accessSection.includes(phrase), `operator client access UI must include ${phrase}`);
 }
-assert.ok(accessActions.includes("/portal/accept?token="), "operator must receive a real acceptance link");
-assert.ok(accessActions.includes("create_managed_client_invitation"), "operator UI must call invitation RPC");
+for (const phrase of [
+  "/portal/accept?token=",
+  "create_managed_client_invitation",
+  "RESEND_API_KEY",
+  "RESEND_FROM",
+  "sendInvitationEmail",
+  'delivery: sent ? "sent" : "manual"',
+  "email delivery was not confirmed",
+]) {
+  assert.ok(accessActions.includes(phrase), `invitation delivery action must include ${phrase}`);
+}
+assert.ok(
+  accessActions.indexOf('supabase.rpc("create_managed_client_invitation"') < accessActions.indexOf("sendInvitationEmail"),
+  "the database invitation must exist before delivery is attempted"
+);
+assert.ok(accessActions.includes("cache: \"no-store\""), "invitation delivery must never be cached");
 
 for (const phrase of [
   "Join {invitation.business_name}",
@@ -122,4 +138,4 @@ assert.ok(middleware.includes("request.nextUrl.search"), "protected redirects mu
 assert.ok(opsLayout.includes('href="/ops/access"'), "Admin HQ must expose client access management");
 assert.ok(serviceLayout.includes("Service Desk — The Admin Department"), "managed portal metadata must use TAD branding");
 
-console.log("Managed service commercial, invitation and auth lifecycle contract passed.");
+console.log("Managed service commercial, invitation, delivery and auth lifecycle contract passed.");
