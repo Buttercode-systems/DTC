@@ -53,6 +53,7 @@ export function ClientAccessSection({
             The invitation is locked to the exact email address below. The client must sign in or create an account with that same email before the workspace can be claimed.
           </p>
           <ul className="mt-4 space-y-2 text-sm text-faint">
+            <li>• The system emails the private link and also shows it once for manual delivery.</li>
             <li>• Owner and manager roles can approve decisions and respond to reports.</li>
             <li>• Viewer access is read-only.</li>
             <li>• Links expire after seven days and can be revoked immediately.</li>
@@ -85,9 +86,23 @@ export function ClientAccessSection({
       </section>
 
       {state.invitationUrl && (
-        <section className="border border-ledger/40 bg-ledger/5 p-5" aria-live="polite">
-          <p className="eyebrow">Invitation ready</p>
-          <h2 className="mt-2 font-display text-2xl">Send this private link to {state.email}</h2>
+        <section
+          className={`border p-5 ${
+            state.delivery === "sent"
+              ? "border-ledger/40 bg-ledger/5"
+              : "border-slowing/40 bg-slowing/10"
+          }`}
+          aria-live="polite"
+        >
+          <p className="eyebrow">
+            {state.delivery === "sent" ? "Invitation emailed" : "Manual delivery required"}
+          </p>
+          <h2 className="mt-2 font-display text-2xl">
+            {state.delivery === "sent"
+              ? `Client Portal invitation sent to ${state.email}`
+              : `Send this private link to ${state.email}`}
+          </h2>
+          {state.notice && <p className="mt-2 text-sm font-semibold">{state.notice}</p>}
           <p className="mt-2 text-sm text-faint">
             Expires {state.expiresAt ? formatDate(state.expiresAt) : "in seven days"}. The full link is shown once; creating another invitation revokes the previous pending link.
           </p>
@@ -182,7 +197,7 @@ function CreateButton() {
   const { pending } = useFormStatus();
   return (
     <button className="btn-primary" disabled={pending}>
-      {pending ? "Creating secure link…" : "Create Client Portal invitation"}
+      {pending ? "Creating and sending…" : "Create and email Client Portal invitation"}
     </button>
   );
 }
