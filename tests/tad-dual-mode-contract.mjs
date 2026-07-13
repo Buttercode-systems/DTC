@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(path, "utf8");
 const migration = read("supabase/migrations/0028_tad_saas_managed_platform.sql");
+const foundation = read("supabase/migrations/0012_tad_service_delivery_foundation.sql");
 const nav = read("components/NavLinks.tsx");
 const departments = read("app/app/departments/page.tsx");
 const departmentPage = read("app/app/departments/[department]/page.tsx");
@@ -15,7 +16,6 @@ const middleware = read("middleware.ts");
 
 for (const phrase of [
   "delivery_mode in ('self_service','managed','hybrid')",
-  "unique (business_id, department)",
   "workspace_plans",
   "workspace_subscriptions",
   "workspace_invitations",
@@ -29,6 +29,7 @@ for (const phrase of [
 ]) {
   assert.ok(migration.includes(phrase), `dual-mode migration must include ${phrase}`);
 }
+assert.ok(foundation.includes("unique (business_id, department)"), "one engagement per business department must remain enforced");
 
 assert.equal(
   migration.includes("p_business_id uuid") && migration.includes("can_manage_business(p_business_id"),
@@ -63,10 +64,10 @@ for (const phrase of [
 ]) {
   assert.ok(departmentPage.includes(phrase), `department workspace must include ${phrase}`);
 }
-assert.ok(departmentActions.includes('activate_all_tad_departments'));
-assert.ok(departmentActions.includes('set_tad_department_mode'));
-assert.ok(workflowActions.includes('create_service_work_item'));
-assert.ok(workflowActions.includes('update_service_work_item'));
+assert.ok(departmentActions.includes("activate_all_tad_departments"));
+assert.ok(departmentActions.includes("set_tad_department_mode"));
+assert.ok(workflowActions.includes("create_service_work_item"));
+assert.ok(workflowActions.includes("update_service_work_item"));
 
 for (const phrase of [
   "One queue across every department",
@@ -79,9 +80,9 @@ for (const phrase of [
   assert.ok(today.includes(phrase), `unified Today must include ${phrase}`);
 }
 
-assert.ok(signup.includes('activate_all_tad_departments'));
+assert.ok(signup.includes("activate_all_tad_departments"));
 assert.ok(signup.includes('p_delivery_mode: "self_service"'));
-assert.ok(portal.includes('activate_all_tad_departments'));
+assert.ok(portal.includes("activate_all_tad_departments"));
 assert.ok(portal.includes('p_delivery_mode: "managed"'));
 assert.equal(middleware.includes("standaloneOnlyRoutes"), false, "middleware must allow one platform for both operating modes");
 
