@@ -98,7 +98,8 @@ for (const phrase of [
   assert.ok(accessActions.includes(phrase), `invitation delivery action must include ${phrase}`);
 }
 assert.ok(
-  accessActions.indexOf('supabase.rpc("create_managed_client_invitation"') < accessActions.indexOf("sendInvitationEmail"),
+  accessActions.indexOf('supabase.rpc("create_managed_client_invitation"') <
+    accessActions.indexOf("const sent = await sendInvitationEmail"),
   "the database invitation must exist before delivery is attempted"
 );
 assert.ok(accessActions.includes("cache: \"no-store\""), "invitation delivery must never be cached");
