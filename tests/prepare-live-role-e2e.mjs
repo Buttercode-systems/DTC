@@ -3,24 +3,117 @@ import { readFileSync, writeFileSync } from "node:fs";
 const path = "tests/tad-live-role-e2e.mjs";
 let source = readFileSync(path, "utf8");
 
-const signupFailure = '  if (error && !error.message.toLowerCase().includes("already registered")) throw error;';
-if (!source.includes(signupFailure)) throw new Error("Could not locate operator signup failure handling");
-source = source.replace(
-  signupFailure,
+function replaceOnce(before, after, label) {
+  if (!source.includes(before)) throw new Error(`Could not locate ${label}`);
+  source = source.replace(before, after);
+}
+
+replaceOnce(
+  'import { mkdirSync, writeFileSync } from "node:fs";',
+  'import { mkdirSync, readFileSync, writeFileSync } from "node:fs";',
+  "filesystem import"
+);
+replaceOnce(
+  'const operatorEmail = `ramatsienkoanyane07+tad-e2e-${runId}-operator@gmail.com`;',
   [
-    '  if (error && !error.message.toLowerCase().includes("already registered")) {',
-    '    state.error = `OPERATOR_SIGNUP_FAILED:${error.code || "unknown"}:${error.message}`;',
-    '    saveState();',
-    '    throw error;',
-    '  }',
-  ].join("\n")
+    'const bootstrap = JSON.parse(readFileSync("test-results/tad-live-e2e/registration-bootstrap-private.json", "utf8"));',
+    'assert.equal(bootstrap.runId, runId, "Registration bootstrap run ID must match");',
+    'const operatorEmail = bootstrap.operatorEmail;',
+  ].join("\n"),
+  "operator email"
+);
+replaceOnce(
+  'const operatorPassword = `Tad!${randomBytes(24).toString("base64url")}`;',
+  'const operatorPassword = bootstrap.operatorPassword;',
+  "operator passphrase"
 );
 
-const start = source.indexOf("async function clientDecisionAndReport(");
-const end = source.indexOf("\nasync function testManagedRouteRestrictions", start);
-if (start < 0 || end < 0) throw new Error("Could not locate clientDecisionAndReport");
+const signupStart = source.indexOf("async function signupOperator(");
+const signupEnd = source.indexOf("\nasync function waitForPasswordSession", signupStart);
+if (signupStart < 0 || signupEnd < 0) throw new Error("Could not locate signupOperator");
+const bootstrapFunction = `async function bootstrapOperatorWithInvitation(page) {
+  const invitationUrl = \`\${appUrl}/portal/join?token=\${encodeURIComponent(bootstrap.invitationToken)}\`;
+  const started = Date.now();
+  while (Date.now() - started < 15 * 60_000) {
+    await page.goto(invitationUrl, { waitUntil: "networkidle" });
+    if ((await page.getByRole("heading", { name: "Create your Client Portal account" }).count()) > 0) {
+      assert.equal(await page.getByLabel("Invited email").inputValue(), operatorEmail);
+      await page.getByLabel("Create passphrase").fill(operatorPassword);
+      await Promise.all([
+        page.waitForURL(/\\/app\\/service/, { timeout: 60_000 }),
+        page.getByRole("button", { name: "Create Client Portal account" }).click(),
+      ]);
+      await page.getByRole("heading", { name: "Your Service Desk" }).waitFor();
+      console.log("OPERATOR_INVITATION_REGISTRATION_OK");
+      return;
+    }
+    console.log("WAITING_OPERATOR_BOOTSTRAP_INVITATION");
+    await new Promise((resolve) => setTimeout(resolve, 15_000));
+  }
+  throw new Error("Operator bootstrap invitation timed out");
+}
+`;
+source = `${source.slice(0, signupStart)}${bootstrapFunction}${source.slice(signupEnd)}`;
 
-const replacement = `async function switchClientWorkspace(page, businessId) {
+replaceOnce(
+  [
+    "await signupOperator();",
+    'await waitForPasswordSession(operatorEmail, operatorPassword, "OPERATOR");',
+    "",
+  ].join("\n"),
+  "",
+  "open-signup bootstrap calls"
+);
+replaceOnce(
+  "try {\n  await waitForOperatorAccess(operatorPage);",
+  [
+    "try {",
+    "  await bootstrapOperatorWithInvitation(operatorPage);",
+    "  await operatorContext.clearCookies();",
+    '  await waitForPasswordSession(operatorEmail, operatorPassword, "OPERATOR", 60_000);',
+    "  await waitForOperatorAccess(operatorPage);",
+  ].join("\n"),
+  "operator browser start"
+);
+
+const accountStart = source.indexOf("async function createClientAccount(");
+const accountEnd = source.indexOf("\nasync function claimInvitation", accountStart);
+if (accountStart < 0 || accountEnd < 0) throw new Error("Could not locate createClientAccount");
+const accountReplacement = `async function createClientAccount(page, url, department) {
+  await page.goto(url, { waitUntil: "networkidle" });
+  await page.getByRole("link", { name: "Create client account" }).click();
+  await page.waitForLoadState("networkidle");
+  assert.equal(await page.getByLabel("Invited email").inputValue(), clientEmail);
+  await page.getByLabel("Create passphrase").fill(clientPassword);
+  await Promise.all([
+    page.waitForURL(/\\/app\\/service/, { timeout: 60_000 }),
+    page.getByRole("button", { name: "Create Client Portal account" }).click(),
+  ]);
+  await page.getByRole("heading", { name: "Your Service Desk" }).waitFor();
+  await page.getByText(department.label, { exact: true }).waitFor();
+  console.log("CLIENT_INVITATION_REGISTRATION_OK");
+}
+`;
+source = `${source.slice(0, accountStart)}${accountReplacement}${source.slice(accountEnd)}`;
+
+replaceOnce(
+  [
+    "  await createClientAccount(clientPage, invoice.invitation);",
+    '  await waitForPasswordSession(clientEmail, clientPassword, "CLIENT");',
+    "  await claimInvitation(clientPage, invoice, true);",
+    "  for (const department of departments.slice(1)) await claimInvitation(clientPage, department);",
+  ].join("\n"),
+  [
+    "  await createClientAccount(clientPage, invoice.invitation, invoice);",
+    "  for (const department of departments.slice(1)) await claimInvitation(clientPage, department);",
+  ].join("\n"),
+  "client registration sequence"
+);
+
+const decisionStart = source.indexOf("async function clientDecisionAndReport(");
+const decisionEnd = source.indexOf("\nasync function testManagedRouteRestrictions", decisionStart);
+if (decisionStart < 0 || decisionEnd < 0) throw new Error("Could not locate clientDecisionAndReport");
+const decisionReplacement = `async function switchClientWorkspace(page, businessId) {
   await page.goto(\`\${appUrl}/app/service\`, { waitUntil: "networkidle" });
   const switcher = page.getByLabel("Client workspace");
   if ((await switcher.count()) === 0) return;
@@ -56,7 +149,7 @@ async function clientDecisionAndReport(page, invoice, member, invoiceDecision, m
   console.log("CLIENT_OWNER_AND_VIEWER_PERMISSIONS_OK");
 }
 `;
+source = `${source.slice(0, decisionStart)}${decisionReplacement}${source.slice(decisionEnd)}`;
 
-source = `${source.slice(0, start)}${replacement}${source.slice(end)}`;
 writeFileSync(path, source);
-console.log("Prepared live E2E workspace navigation and signup diagnostics.");
+console.log("Prepared live E2E for invitation-verified operator and client registration.");
