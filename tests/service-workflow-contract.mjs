@@ -5,6 +5,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 
 const schema = read('supabase/migrations/0016_service_workflow_schema.sql');
 const templates = read('supabase/migrations/0017_service_workflow_templates.sql');
+const completion = read('supabase/migrations/0031_complete_workflow_templates_and_pin_engagements.sql');
 const readCreate = read('supabase/migrations/0018_service_workflow_read_create.sql');
 const update = read('supabase/migrations/0019_service_workflow_update.sql');
 const sync = read('supabase/migrations/0020_service_workflow_action_sync.sql');
@@ -23,30 +24,24 @@ const todayList = read('components/TodayList.tsx');
 const opsPage = read('app/ops/page.tsx');
 const nav = read('components/NavLinks.tsx');
 
-for (const table of [
-  'service_workflow_templates',
-  'service_work_items',
-  'service_work_item_events'
-]) {
+for (const table of ['service_workflow_templates','service_work_items','service_work_item_events']) {
   assert.ok(schema.includes(`public.${table}`), `${table} schema must exist`);
   assert.ok(schema.includes(`alter table public.${table} enable row level security`), `${table} must retain RLS`);
 }
 
 const expectedTemplates = [
-  ['invoice-admin-v1', 'invoice'],
-  ['sales-admin-v1', 'sales'],
-  ['client-admin-v1', 'client'],
-  ['property-admin-v1', 'property'],
-  ['practice-admin-v1', 'practice'],
-  ['member-admin-v1', 'member'],
-  ['core-admin-v1', 'core']
+  ['invoice-admin-v1','invoice'],['sales-admin-v1','sales'],['client-admin-v1','client'],
+  ['property-admin-v1','property'],['practice-admin-v1','practice'],['member-admin-v1','member'],['core-admin-v1','core']
 ];
 for (const [key, department] of expectedTemplates) {
-  assert.ok(templates.includes(`'${key}','${department}'`), `${key} must be seeded`);
+  assert.ok(templates.includes(`'${key}','${department}'`) || completion.includes(`'${key}'`), `${key} must be seeded`);
 }
-assert.ok(templates.includes("'data_warning'"), 'practice template must carry its protected-data warning');
+assert.ok(templates.includes("'data_warning'") || completion.includes("'data_warning'"), 'practice template must carry its protected-data warning');
+for (const phrase of ['template_key','workflow_template_not_found','order by version desc','v_engagement.template_key']) {
+  assert.ok(completion.includes(phrase), `managed onboarding must pin ${phrase}`);
+}
 
-for (const fn of ['get_service_workflow', 'create_service_work_item']) {
+for (const fn of ['get_service_workflow','create_service_work_item']) {
   assert.ok(readCreate.includes(`function public.${fn}`), `${fn} must exist`);
   assert.ok(readCreate.includes(`revoke all on function public.${fn}`), `${fn} must revoke broad execution`);
 }
@@ -59,20 +54,12 @@ assert.ok(outcome.includes('reflect_service_workflow_outcome'), 'action outcomes
 assert.ok(reporting.includes("'workflow_completed'"), 'weekly reports must include workflow completion');
 assert.ok(reporting.includes("'workflow_blocked'"), 'weekly reports must include blocked workflow records');
 
-for (const contract of ['createWorkflowItem', 'updateWorkflowItem', 'sync_service_workflow_actions']) {
-  assert.ok(workflowActions.includes(contract), `workflow server actions must include ${contract}`);
-}
-for (const control of ['Assigned person', 'Next action due', 'Blocked reason', 'Update record', 'Workflow map']) {
-  assert.ok(workflowPage.includes(control), `workflow UI must expose ${control}`);
-}
+for (const contract of ['createWorkflowItem','updateWorkflowItem','sync_service_workflow_actions']) assert.ok(workflowActions.includes(contract), `workflow server actions must include ${contract}`);
+for (const control of ['Assigned person','Next action due','Blocked reason','Update record','Workflow map']) assert.ok(workflowPage.includes(control), `workflow UI must expose ${control}`);
 assert.ok(workflowPage.includes('data_warning'), 'workflow UI must display template data warnings');
 assert.ok(workflowIndex.includes('Configurable service workflows'), 'operator console must include a workflow portfolio');
 
-for (const fn of [
-  'decide_client_service_approval',
-  'respond_to_service_report',
-  'get_tad_client_responses'
-]) {
+for (const fn of ['decide_client_service_approval','respond_to_service_report','get_tad_client_responses']) {
   assert.ok(serviceDeskMigration.includes(`function public.${fn}`), `${fn} must exist`);
   assert.ok(serviceDeskMigration.includes(`revoke all on function public.${fn}`), `${fn} must revoke broad execution`);
 }
@@ -80,42 +67,15 @@ assert.ok(serviceDeskMigration.includes('public.can_manage_business'), 'client d
 assert.ok(serviceDeskMigration.includes("('continue', 'change', 'stop')"), 'weekly reports must capture continue/change/stop');
 assert.equal(serviceDeskMigration.includes('get_client_service_desk'), false, 'Service Desk must reuse established workflow and RLS reads');
 
-for (const contract of [
-  'sync_service_approval_action',
-  'guard_client_approval_action_completion',
-  "'client_approval'",
-  "'service_approval:'"
-]) {
-  assert.ok(approvalActionMigration.includes(contract), `approval action loop must include ${contract}`);
-}
+for (const contract of ['sync_service_approval_action','guard_client_approval_action_completion',"'client_approval'","'service_approval:'"]) assert.ok(approvalActionMigration.includes(contract), `approval action loop must include ${contract}`);
 assert.ok(approvalActionMigration.includes('approval must be decided in the Service Desk'), 'generic completion must not bypass approval');
-assert.ok(
-  approvalActionMigration.includes('revoke all on function public.sync_service_approval_action() from public, anon, authenticated'),
-  'approval sync trigger function must not be directly executable'
-);
-assert.ok(
-  approvalActionMigration.includes('revoke all on function public.guard_client_approval_action_completion() from public, anon, authenticated'),
-  'approval guard trigger function must not be directly executable'
-);
+assert.ok(approvalActionMigration.includes('revoke all on function public.sync_service_approval_action() from public, anon, authenticated'), 'approval sync trigger function must not be directly executable');
+assert.ok(approvalActionMigration.includes('revoke all on function public.guard_client_approval_action_completion() from public, anon, authenticated'), 'approval guard trigger function must not be directly executable');
 
-for (const surface of ['Your Service Desk', 'Today actions', 'Open today’s actions']) {
-  assert.ok(serviceDeskPage.includes(surface), `Service Desk must expose ${surface}`);
-}
-for (const readContract of [
-  'get_service_workflow',
-  'service_approvals',
-  'service_reports',
-  'can_manage_business',
-  "new Set(payload?.template.config.closed_statuses"
-]) {
-  assert.ok(serviceDeskPage.includes(readContract), `Service Desk must reuse ${readContract}`);
-}
-for (const surface of ['Approvals waiting', 'Owner or manager decision required']) {
-  assert.ok(approvalSection.includes(surface), `approval surface must expose ${surface}`);
-}
-for (const surface of ['Service reports', 'Continue', 'Change the workflow', 'Stop']) {
-  assert.ok(reportSection.includes(surface), `report surface must expose ${surface}`);
-}
+for (const surface of ['Your Service Desk','Today actions','Open today’s actions']) assert.ok(serviceDeskPage.includes(surface), `Service Desk must expose ${surface}`);
+for (const readContract of ['get_service_workflow','service_approvals','service_reports','can_manage_business',"new Set(payload?.template.config.closed_statuses"]) assert.ok(serviceDeskPage.includes(readContract), `Service Desk must reuse ${readContract}`);
+for (const surface of ['Approvals waiting','Owner or manager decision required']) assert.ok(approvalSection.includes(surface), `approval surface must expose ${surface}`);
+for (const surface of ['Service reports','Continue','Change the workflow','Stop']) assert.ok(reportSection.includes(surface), `report surface must expose ${surface}`);
 assert.ok(serviceDeskActions.includes('decide_client_service_approval'), 'client approval action must use the scoped RPC');
 assert.ok(serviceDeskActions.includes('respond_to_service_report'), 'client report response must use the scoped RPC');
 assert.ok(todayList.includes('Review decision →'), 'Today must route approval tasks to the Service Desk');
@@ -124,4 +84,4 @@ assert.ok(opsPage.includes('get_tad_client_responses'), 'operator console must l
 assert.ok(opsPage.includes('action.kind === "client_approval"'), 'operators must not complete approvals as generic outcomes');
 assert.ok(nav.includes('/app/service'), 'client navigation must expose the Service Desk');
 
-console.log('Configurable service workflow and client Service Desk contract passed.');
+console.log('Configurable service workflow, template pinning and client Service Desk contract passed.');
