@@ -1,11 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-type AccessibleBusiness = {
-  id: string;
-  managed_by_tad: boolean;
-};
-
 function redirectWithCookies(url: URL, response: NextResponse): NextResponse {
   const redirect = NextResponse.redirect(url);
   response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
@@ -32,7 +27,9 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const pathname = request.nextUrl.pathname;
   const protectedRoute =
     pathname.startsWith("/app") ||
@@ -47,40 +44,6 @@ export async function middleware(request: NextRequest) {
     url.search = "";
     url.searchParams.set("next", pathname);
     return redirectWithCookies(url, response);
-  }
-
-  const standaloneOnlyRoutes = [
-    "/app/report",
-    "/app/pipeline",
-    "/app/leads",
-    "/app/quotes",
-    "/app/invoices",
-    "/app/customers",
-    "/app/import",
-    "/app/settings",
-  ];
-  const standaloneOnly = standaloneOnlyRoutes.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
-
-  if (user && standaloneOnly) {
-    const [{ data: businesses }, { data: preference }] = await Promise.all([
-      supabase.rpc("list_accessible_businesses"),
-      supabase
-        .from("user_preferences")
-        .select("active_business_id")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-    ]);
-    const accessible = (businesses ?? []) as AccessibleBusiness[];
-    const preferredId = preference?.active_business_id as string | null | undefined;
-    const active = accessible.find((business) => business.id === preferredId) ?? accessible[0];
-    if (active?.managed_by_tad) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/app/service";
-      url.search = "";
-      return redirectWithCookies(url, response);
-    }
   }
 
   return response;
