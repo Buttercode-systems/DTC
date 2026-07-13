@@ -5,6 +5,7 @@ const read = (path) => readFileSync(path, "utf8");
 const baseMigration = read("supabase/migrations/0024_tad_application_pipeline.sql");
 const departmentMigration = read("supabase/migrations/0025_multi_department_tad_applications.sql");
 const lifecycleMigration = read("supabase/migrations/0027_client_access_and_commercial_gates.sql");
+const intakeHardening = read("supabase/migrations/0029_harden_public_tad_intake.sql");
 const endpoint = read("app/api/tad/applications/route.ts");
 const page = read("app/ops/applications/page.tsx");
 const actions = read("app/ops/applications/actions.ts");
@@ -67,6 +68,25 @@ assert.ok(endpoint.includes('payload.department || "sales"'), "Sales clients rem
 assert.ok(endpoint.includes("payload.workflow_problem || payload.follow_up_problem"), "old Sales payload remains accepted");
 
 for (const phrase of [
+  "guard_tad_application_intake",
+  "pg_advisory_xact_lock",
+  "intake_capacity_reached",
+  "email_application_limit_reached",
+  ">= 100",
+  ">= 6",
+  "before insert on public.tad_applications",
+  "revoke all on function public.submit_tad_application",
+  "from public, anon, authenticated",
+]) {
+  assert.ok(intakeHardening.includes(phrase), `database intake hardening must include ${phrase}`);
+}
+assert.ok(
+  intakeHardening.indexOf("create trigger tad_application_intake_guard") <
+    intakeHardening.indexOf("revoke all on function public.submit_tad_application"),
+  "the non-bypassable table guard must exist before the legacy public endpoint is removed"
+);
+
+for (const phrase of [
   "Managed admin intake",
   "list_tad_applications",
   "Create {departmentLabel} workspace",
@@ -95,4 +115,4 @@ assert.ok(actions.includes("start_tad_application_onboarding"), "onboarding acti
 assert.ok(layout.includes('href="/ops/applications"'), "operator navigation must link to applications");
 assert.ok(layout.includes('href="/ops/access"'), "operator navigation must link to client access");
 
-console.log("Multi-department TAD application and commercial gate contract passed.");
+console.log("Multi-department TAD application, abuse-control and commercial gate contract passed.");
