@@ -7,6 +7,7 @@ const appLayout = read("app/app/layout.tsx");
 const opsLayout = read("app/ops/layout.tsx");
 const login = read("app/login/page.tsx");
 const signIn = read("app/auth/signin/route.ts");
+const safeNext = read("lib/safe-next.ts");
 const middleware = read("middleware.ts");
 const operator = read("lib/operator.ts");
 const start = read("app/start/page.tsx");
@@ -57,8 +58,19 @@ for (const phrase of [
 ]) {
   assert.ok(login.includes(phrase), `login must include ${phrase}`);
 }
-assert.ok(signIn.includes('typeof value === "string" ? value : "/start"'), "sign-in default must be role-aware");
-assert.ok(signIn.includes(': "/start"'), "unsafe redirects must fall back to /start");
+for (const phrase of ["safeRelativeDestination", "applyRelativeDestination", '"/start"']) {
+  assert.ok(signIn.includes(phrase), `sign-in redirect handling must include ${phrase}`);
+}
+for (const phrase of [
+  "candidate.startsWith(\"/\")",
+  "candidate.startsWith(\"//\")",
+  "parsed.pathname",
+  "parsed.search",
+  "parsed.hash",
+  "return fallback",
+]) {
+  assert.ok(safeNext.includes(phrase), `safe redirect helper must include ${phrase}`);
+}
 
 for (const phrase of [
   'pathname.startsWith("/hq")',

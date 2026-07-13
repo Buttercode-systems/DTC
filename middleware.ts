@@ -34,18 +34,20 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const pathname = request.nextUrl.pathname;
+  const publicPortalEntry = pathname === "/portal/accept" || pathname === "/portal/join";
   const protectedRoute =
     pathname.startsWith("/app") ||
     pathname.startsWith("/ops") ||
     pathname.startsWith("/hq") ||
-    pathname.startsWith("/portal") ||
+    (pathname.startsWith("/portal") && !publicPortalEntry) ||
     pathname.startsWith("/start");
 
   if (!user && protectedRoute) {
     const url = request.nextUrl.clone();
+    const next = `${pathname}${request.nextUrl.search}`;
     url.pathname = "/login";
     url.search = "";
-    url.searchParams.set("next", pathname);
+    url.searchParams.set("next", next);
     return redirectWithCookies(url, response);
   }
 

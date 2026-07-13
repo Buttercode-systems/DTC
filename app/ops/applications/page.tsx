@@ -26,6 +26,10 @@ type Application = {
   status: string;
   qualification_notes: string | null;
   commercial_decision: string;
+  payment_status: string;
+  payment_reference: string | null;
+  payment_confirmed_at: string | null;
+  scope_accepted_at: string | null;
   managed_business_id: string | null;
   managed_business_name: string | null;
   source: string;
@@ -110,6 +114,14 @@ const DECISION_OPTIONS = [
   ["declined", "Declined"],
 ] as const;
 
+const PAYMENT_OPTIONS = [
+  ["not_requested", "Not requested"],
+  ["pending", "Pending"],
+  ["paid", "Paid"],
+  ["waived", "Waived / internal pilot"],
+  ["refunded", "Refunded"],
+] as const;
+
 export default async function ApplicationsPage() {
   const { supabase } = await requireOperator();
   const { data, error } = await supabase.rpc("list_tad_applications");
@@ -125,7 +137,7 @@ export default async function ApplicationsPage() {
             Applications
           </h1>
           <p className="mt-3 max-w-3xl text-faint leading-7">
-            Review qualification facts, record the commercial decision and create the correct private DueToday department workspace only after an application is qualified.
+            Review qualification facts and record the commercial decision. A private TAD managed workspace can only be created after the scope is accepted and setup payment is marked paid or waived.
           </p>
         </div>
         <a
@@ -158,6 +170,14 @@ export default async function ApplicationsPage() {
               DEPARTMENT_LABELS[application.department] ?? application.department;
             const offerPath =
               OFFER_PATHS[application.department] ?? "admin-systems.html";
+            const paymentReady = ["paid", "waived"].includes(application.payment_status);
+            const scopeReady = Boolean(application.scope_accepted_at);
+            const commerciallyReady =
+              application.status === "qualified" &&
+              application.commercial_decision === "accepted" &&
+              paymentReady &&
+              scopeReady;
+
             return (
               <article key={application.id} className="border border-rule bg-card p-5 sm:p-6">
                 <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
@@ -168,7 +188,13 @@ export default async function ApplicationsPage() {
                         {application.readiness_score}/10 readiness
                       </span>
                       <span className="badge">{application.status}</span>
-                      <span className="badge">{application.commercial_decision}</span>
+                      <span className="badge">Offer {application.commercial_decision}</span>
+                      <span className={`badge ${paymentReady ? "badge-good" : "badge-warn"}`}>
+                        Payment {application.payment_status.replaceAll("_", " ")}
+                      </span>
+                      <span className={`badge ${scopeReady ? "badge-good" : "badge-warn"}`}>
+                        Scope {scopeReady ? "accepted" : "pending"}
+                      </span>
                     </div>
                     <h2 className="mt-3 font-display text-2xl">{application.business_name}</h2>
                     <p className="mt-1 text-sm text-faint">
@@ -200,7 +226,7 @@ export default async function ApplicationsPage() {
                     </div>
                   </div>
 
-                  <div className="w-full border-t border-rule pt-5 xl:w-[360px] xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
+                  <div className="w-full border-t border-rule pt-5 xl:w-[380px] xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
                     <form action={updateTadApplication} className="space-y-3">
                       <input type="hidden" name="application_id" value={application.id} />
                       <label className="block text-xs font-semibold uppercase tracking-wider text-faint">
@@ -214,6 +240,34 @@ export default async function ApplicationsPage() {
                         <select name="commercial_decision" defaultValue={application.commercial_decision} className="field mt-1">
                           {DECISION_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                         </select>
+                      </label>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-faint">
+                        Setup payment
+                        <select name="payment_status" defaultValue={application.payment_status} className="field mt-1">
+                          {PAYMENT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                      </label>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-faint">
+                        Payment reference
+                        <input
+                          name="payment_reference"
+                          defaultValue={application.payment_reference ?? ""}
+                          maxLength={200}
+                          className="field mt-1"
+                          placeholder="Invoice, EFT or waiver reference"
+                        />
+                      </label>
+                      <label className="flex items-start gap-3 border border-rule bg-paper p-3 text-sm">
+                        <input
+                          type="checkbox"
+                          name="scope_accepted"
+                          defaultChecked={scopeReady}
+                          className="mt-1"
+                        />
+                        <span>
+                          <strong className="block">Scope accepted</strong>
+                          <span className="text-faint">The client accepted the department, price, operating boundary and starting-record limit.</span>
+                        </span>
                       </label>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-faint">
                         Qualification notes
@@ -236,7 +290,7 @@ export default async function ApplicationsPage() {
                       >
                         Open managed workspace
                       </Link>
-                    ) : application.status === "qualified" ? (
+                    ) : commerciallyReady ? (
                       <form action={startTadApplicationOnboarding} className="mt-3">
                         <input type="hidden" name="application_id" value={application.id} />
                         <button className="btn-primary w-full">
@@ -244,9 +298,13 @@ export default async function ApplicationsPage() {
                         </button>
                       </form>
                     ) : (
-                      <p className="mt-3 text-xs leading-5 text-faint">
-                        Mark the application qualified before creating a private managed workspace.
-                      </p>
+                      <div className="mt-3 border border-slowing/40 bg-slowing/10 p-3 text-xs leading-5">
+                        <strong className="block">Workspace locked until all gates pass:</strong>
+                        <span className="block">{application.status === "qualified" ? "✓" : "○"} Application qualified</span>
+                        <span className="block">{application.commercial_decision === "accepted" ? "✓" : "○"} Offer accepted</span>
+                        <span className="block">{paymentReady ? "✓" : "○"} Setup payment paid or waived</span>
+                        <span className="block">{scopeReady ? "✓" : "○"} Scope accepted</span>
+                      </div>
                     )}
                   </div>
                 </div>

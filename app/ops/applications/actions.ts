@@ -11,6 +11,7 @@ function value(formData: FormData, key: string, max = 1000): string {
 function refresh(): void {
   revalidatePath("/ops/applications");
   revalidatePath("/ops");
+  revalidatePath("/ops/access");
 }
 
 export async function updateTadApplication(formData: FormData): Promise<void> {
@@ -18,13 +19,17 @@ export async function updateTadApplication(formData: FormData): Promise<void> {
   const applicationId = value(formData, "application_id", 80);
   const status = value(formData, "status", 30);
   const commercialDecision = value(formData, "commercial_decision", 30) || "pending";
+  const paymentStatus = value(formData, "payment_status", 30) || "not_requested";
   if (!applicationId) throw new Error("Application is required.");
 
-  const { error } = await supabase.rpc("update_tad_application", {
+  const { error } = await supabase.rpc("review_tad_application", {
     p_application_id: applicationId,
     p_status: status,
     p_qualification_notes: value(formData, "qualification_notes", 2000) || null,
     p_commercial_decision: commercialDecision,
+    p_payment_status: paymentStatus,
+    p_payment_reference: value(formData, "payment_reference", 200) || null,
+    p_scope_accepted: formData.get("scope_accepted") === "on",
   });
   if (error) throw new Error(`Could not update application: ${error.message}`);
   refresh();
@@ -43,5 +48,5 @@ export async function startTadApplicationOnboarding(formData: FormData): Promise
   const result = data as { business_id?: string } | null;
   if (!result?.business_id) throw new Error("Managed workspace was not created.");
   refresh();
-  redirect(`/ops/client/${result.business_id}`);
+  redirect(`/ops/client/${result.business_id}/access`);
 }

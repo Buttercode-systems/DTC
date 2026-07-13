@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase/route";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { applyRelativeDestination, safeRelativeDestination } from "@/lib/safe-next";
 
 type NextValue = FormDataEntryValue | string | null;
 
 function safeNext(value: NextValue): string {
-  const next = typeof value === "string" ? value : "/start";
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/start";
+  return safeRelativeDestination(typeof value === "string" ? value : null, "/start");
 }
 
 function loginRedirect(request: NextRequest, next: string, error: string): NextResponse {
@@ -19,9 +19,7 @@ function loginRedirect(request: NextRequest, next: string, error: string): NextR
 }
 
 function appRedirect(request: NextRequest, next: string): NextResponse {
-  const url = request.nextUrl.clone();
-  url.pathname = next;
-  url.search = "";
+  const url = applyRelativeDestination(request.nextUrl.clone(), next);
   return NextResponse.redirect(url, { status: 303 });
 }
 
