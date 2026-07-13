@@ -15,6 +15,7 @@ const PLATFORM_LINKS: NavItem[] = [
   { href: "/app/service#decisions", label: "Approvals", anchor: true },
   { href: "/app/service#reports", label: "Reports", anchor: true },
   { href: "/app/import", label: "Imports" },
+  { href: "/app/team", label: "Team" },
   { href: "/app/account", label: "Account" },
   { href: "/app/settings", label: "Settings" },
 ];
