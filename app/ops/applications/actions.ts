@@ -11,6 +11,7 @@ function value(formData: FormData, key: string, max = 1000): string {
 function refresh(): void {
   revalidatePath("/ops/applications");
   revalidatePath("/ops");
+  revalidatePath("/ops/access");
 }
 
 export async function updateTadApplication(formData: FormData): Promise<void> {
@@ -47,5 +48,5 @@ export async function startTadApplicationOnboarding(formData: FormData): Promise
   const result = data as { business_id?: string } | null;
   if (!result?.business_id) throw new Error("Managed workspace was not created.");
   refresh();
-  redirect(`/ops/client/${result.business_id}`);
+  redirect(`/ops/client/${result.business_id}/access`);
 }
