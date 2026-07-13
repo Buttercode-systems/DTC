@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const LINKS = [
+const STANDALONE_LINKS = [
   { href: "/app", label: "Today" },
   { href: "/app/service", label: "Service" },
   { href: "/app/report", label: "Report" },
@@ -16,16 +16,27 @@ const LINKS = [
   { href: "/app/settings", label: "Settings" },
 ];
 
-export function NavLinks() {
+const MANAGED_LINKS = [
+  { href: "/app", label: "Today" },
+  { href: "/app/service", label: "Service Desk" },
+  { href: "/app/service#decisions", label: "Decisions", anchor: true },
+  { href: "/app/service#reports", label: "Reports", anchor: true },
+  { href: "/app/account", label: "Account" },
+];
+
+export function NavLinks({ managedByTad = false }: { managedByTad?: boolean }) {
   const pathname = usePathname();
+  const links = managedByTad ? MANAGED_LINKS : STANDALONE_LINKS;
+
   return (
     <nav
       className="flex items-center gap-4 text-sm whitespace-nowrap min-w-max sm:min-w-0"
-      aria-label="App navigation"
+      aria-label={managedByTad ? "Client portal navigation" : "App navigation"}
     >
-      {LINKS.map((link) => {
-        const active =
-          link.href === "/app"
+      {links.map((link) => {
+        const active = link.anchor
+          ? false
+          : link.href === "/app"
             ? pathname === "/app"
             : pathname.startsWith(link.href);
         return (
