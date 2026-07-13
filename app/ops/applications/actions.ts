@@ -30,6 +30,22 @@ export async function updateTadApplication(formData: FormData): Promise<void> {
   refresh();
 }
 
+export async function confirmTadCommercialGate(formData: FormData): Promise<void> {
+  const { supabase } = await requireOperator();
+  const applicationId = value(formData, "application_id", 80);
+  const paymentStatus = value(formData, "payment_status", 30);
+  if (!applicationId) throw new Error("Application is required.");
+
+  const { error } = await supabase.rpc("confirm_tad_application_commercial_gate", {
+    p_application_id: applicationId,
+    p_payment_status: paymentStatus,
+    p_payment_reference: value(formData, "payment_reference", 200) || null,
+    p_scope_accepted: formData.get("scope_accepted") === "on",
+  });
+  if (error) throw new Error(`Could not confirm payment and scope: ${error.message}`);
+  refresh();
+}
+
 export async function startTadApplicationOnboarding(formData: FormData): Promise<void> {
   const { supabase } = await requireOperator();
   const applicationId = value(formData, "application_id", 80);
