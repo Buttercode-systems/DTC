@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const runId = String(process.env.E2E_RUN_ID || "").replace(/[^A-Za-z0-9_-]/g, "");
-const jobSecret = process.env.E2E_JOB_SECRET;
+const jobSecret = process.env.E2E_JOB_SECRET || process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 assert.ok(runId && jobSecret && supabaseUrl && anonKey, "E2E identity wait configuration is incomplete");
