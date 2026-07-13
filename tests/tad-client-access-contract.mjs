@@ -41,7 +41,11 @@ assert.ok(
 
 assert.ok(portal.includes('supabase.rpc("claim_tad_client_access")'));
 assert.ok(portal.includes('redirect("/login?next=/portal")'));
-assert.ok(portal.indexOf("claim_tad_client_access") < portal.indexOf("requireBusiness"));
+assert.ok(
+  portal.indexOf('supabase.rpc("claim_tad_client_access")') <
+    portal.indexOf('const { business } = await requireBusiness()'),
+  "verified access must be claimed before requireBusiness can provision a standalone workspace"
+);
 
 for (const phrase of [
   "Activate your Client Portal",
