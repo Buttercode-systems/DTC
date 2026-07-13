@@ -16,11 +16,22 @@ test.describe("API and protected route smoke", () => {
     expect(body.error).toEqual(expect.any(String));
   });
 
-  test("unknown report token returns not found", async ({ page }) => {
+  test("unknown report token is handled as a safe not-found response", async ({ page }) => {
     const response = await page.goto(`/report/not-a-real-token-${Date.now()}`);
 
-    expect(response?.status()).toBe(404);
-    await expect(page.locator("body")).toContainText(/404|not found|could not be found/i);
+    // Next.js may return HTTP 200 for a streamed notFound() boundary even though
+    // the rendered document is the framework's 404 page. Verify the user-facing
+    // and indexing-safe contract rather than coupling the test to streaming mode.
+    expect([200, 404]).toContain(response?.status());
+    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible();
+    await expect(page.locator("body")).toContainText(/not found|could not be found/i);
+    await expect(page.locator('head meta[name="robots"]').first()).toHaveAttribute(
+      "content",
+      /noindex/i
+    );
+    await expect(page.locator("body")).not.toContainText(
+      /execution report|invoice|customer|lead details/i
+    );
   });
 
   for (const route of ["/app", "/app/import", "/app/automation", "/app/admin"]) {
