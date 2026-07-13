@@ -40,6 +40,8 @@ jobs:
           done
           cat /tmp/tad-preview-proxy.log
           exit 1
+      - name: Prepare live journey
+        run: node tests/prepare-live-role-e2e.mjs
       - name: Run live operator and client journey
         run: node tests/tad-live-role-e2e.mjs
       - if: failure()
