@@ -12,7 +12,7 @@ export async function requireOperator(): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login?next=/ops");
+  if (!user) redirect("/login?next=/hq");
 
   const { error: claimError } = await supabase.rpc("claim_first_tad_operator");
   if (claimError) {
@@ -23,9 +23,7 @@ export async function requireOperator(): Promise<{
   if (error) throw new Error(`Could not verify operator access: ${error.message}`);
   if (!allowed) redirect("/ops/denied");
 
-  const { error: syncError } = await supabase.rpc(
-    "sync_all_managed_workflow_actions"
-  );
+  const { error: syncError } = await supabase.rpc("sync_all_managed_workflow_actions");
   if (syncError && !syncError.message.includes("function")) {
     throw new Error(`Could not sync managed workflow actions: ${syncError.message}`);
   }

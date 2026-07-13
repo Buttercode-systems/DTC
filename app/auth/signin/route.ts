@@ -5,8 +5,8 @@ import { clientIp, rateLimit } from "@/lib/rate-limit";
 type NextValue = FormDataEntryValue | string | null;
 
 function safeNext(value: NextValue): string {
-  const next = typeof value === "string" ? value : "/app";
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/app";
+  const next = typeof value === "string" ? value : "/start";
+  return next.startsWith("/") && !next.startsWith("//") ? next : "/start";
 }
 
 function loginRedirect(request: NextRequest, next: string, error: string): NextResponse {
@@ -32,7 +32,6 @@ export async function GET(request: NextRequest) {
   const { data } = await supabase.auth.getUser();
 
   if (data.user) return response;
-
   return loginRedirect(request, next, "Sign in to continue.");
 }
 
