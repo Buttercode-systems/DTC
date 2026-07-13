@@ -15,6 +15,7 @@ const hq = read("app/hq/page.tsx");
 const account = read("app/app/account/page.tsx");
 const approvals = read("components/service-desk/ApprovalSection.tsx");
 const reports = read("components/service-desk/ReportSection.tsx");
+const operatorBootstrap = read("supabase/migrations/0026_tad_operator_bootstrap_policy.sql");
 
 for (const phrase of [
   "MANAGED_LINKS",
@@ -84,6 +85,29 @@ assert.ok(portal.includes('"/app/service"'), "portal entry must open the Service
 assert.ok(hq.includes("requireOperator"), "Admin HQ entry must require an operator");
 assert.ok(hq.includes('redirect("/ops")'), "Admin HQ entry must open the operator workspace");
 assert.ok(operator.includes('/login?next=/hq'), "operator authentication must use the branded HQ login");
+assert.ok(operator.includes('claim_first_tad_operator'), "operator entry must run the bootstrap claim");
+assert.ok(operator.includes('is_current_tad_operator'), "operator entry must verify the resulting role");
+
+for (const phrase of [
+  "tad_operator_bootstrap_emails",
+  "ramatsienkoanyane07@gmail.com",
+  "select lower(trim(email))",
+  "allowed.email = v_email",
+  "pg_advisory_xact_lock",
+  "grant execute on function public.claim_first_tad_operator() to authenticated",
+  "insert into public.platform_operators",
+]) {
+  assert.ok(operatorBootstrap.includes(phrase), `operator bootstrap migration must include ${phrase}`);
+}
+assert.ok(
+  operatorBootstrap.indexOf("tad_operator_bootstrap_emails") < operatorBootstrap.indexOf("create or replace function public.claim_first_tad_operator"),
+  "the allowlist table must exist before the bootstrap function is replaced"
+);
+assert.equal(
+  operatorBootstrap.includes("if v_email not in ('buttercoder.dev@gmail.com','bvsic101@gmail.com')"),
+  false,
+  "the bootstrap policy must not regress to the stale two-email production rule"
+);
 
 for (const phrase of [
   "Account and service access",
@@ -97,4 +121,4 @@ for (const phrase of [
 assert.ok(approvals.includes('id="decisions"'), "Service Desk must expose the decisions anchor");
 assert.ok(reports.includes('id="reports"'), "Service Desk must expose the reports anchor");
 
-console.log("TAD Admin HQ and Client Portal unification contract passed.");
+console.log("TAD Admin HQ, Client Portal and operator bootstrap contract passed.");
