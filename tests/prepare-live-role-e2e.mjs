@@ -20,8 +20,8 @@ replaceOnce(
     'const clientPassword = `Client!${randomBytes(24).toString("base64url")}`;',
   ].join("\n"),
   [
-    'const jobSecret = process.env.E2E_JOB_SECRET;',
-    'assert.ok(jobSecret, "E2E job secret is required");',
+    'const jobSecret = process.env.E2E_JOB_SECRET || process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;',
+    'assert.ok(jobSecret, "GitHub OIDC entropy is required");',
     'const derivePassword = (role, prefix) =>',
     '  `${prefix}${createHmac("sha256", jobSecret).update(`${runId}:${role}`).digest("base64url")}`;',
     'const operatorPassword = derivePassword("operator", "Tad!");',
