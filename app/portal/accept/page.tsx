@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { signOut } from "@/app/signup/actions";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { ClaimInvitationForm } from "./ClaimInvitationForm";
 
@@ -76,7 +77,7 @@ export default async function AcceptInvitationPage({
                   Signed in as <strong className="text-ink">{auth.user.email}</strong>
                 </p>
                 <ClaimInvitationForm token={token} />
-                <form action="/auth/signout" method="post" className="mt-3 text-center">
+                <form action={signOut} className="mt-3 text-center">
                   <button className="text-sm font-semibold text-ledger hover:underline">Use a different account</button>
                 </form>
               </>
