@@ -1,21 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase/route";
-
-function safeNext(value: string | null): string {
-  if (!value) return "/app";
-  return value.startsWith("/") && !value.startsWith("//") ? value : "/app";
-}
+import { applyRelativeDestination, safeRelativeDestination } from "@/lib/safe-next";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = safeNext(requestUrl.searchParams.get("next"));
+  const next = safeRelativeDestination(requestUrl.searchParams.get("next"), "/start");
 
   if (code) {
-    const destination = request.nextUrl.clone();
-    destination.pathname = next;
-    destination.search = "";
-
+    const destination = applyRelativeDestination(request.nextUrl.clone(), next);
     const response = NextResponse.redirect(destination, { status: 303 });
     const supabase = createSupabaseRouteClient(request, response);
     const { error } = await supabase.auth.exchangeCodeForSession(code);
