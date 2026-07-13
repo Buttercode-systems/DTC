@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const STANDALONE_LINKS = [
+type NavItem = {
+  href: string;
+  label: string;
+  anchor?: boolean;
+};
+
+const STANDALONE_LINKS: NavItem[] = [
   { href: "/app", label: "Today" },
   { href: "/app/service", label: "Service" },
   { href: "/app/report", label: "Report" },
@@ -16,7 +22,7 @@ const STANDALONE_LINKS = [
   { href: "/app/settings", label: "Settings" },
 ];
 
-const MANAGED_LINKS = [
+const MANAGED_LINKS: NavItem[] = [
   { href: "/app", label: "Today" },
   { href: "/app/service", label: "Service Desk" },
   { href: "/app/service#decisions", label: "Decisions", anchor: true },
