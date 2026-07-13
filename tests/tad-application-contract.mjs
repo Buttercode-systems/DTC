@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(path, "utf8");
 const baseMigration = read("supabase/migrations/0024_tad_application_pipeline.sql");
 const departmentMigration = read("supabase/migrations/0025_multi_department_tad_applications.sql");
+const commercialMigration = read("supabase/migrations/0027_tad_commercial_gate_controls.sql");
 const endpoint = read("app/api/tad/applications/route.ts");
 const page = read("app/ops/applications/page.tsx");
 const actions = read("app/ops/applications/actions.ts");
@@ -42,6 +43,19 @@ for (const phrase of [
 }
 
 for (const phrase of [
+  "confirm_tad_application_commercial_gate",
+  "invalid_payment_status",
+  "commercial_acceptance_required",
+  "payment_confirmed_at",
+  "scope_accepted_at",
+  "commercial_gate_updated",
+  "ready_for_onboarding",
+  "to authenticated",
+]) {
+  assert.ok(commercialMigration.includes(phrase), `commercial gate migration must include ${phrase}`);
+}
+
+for (const phrase of [
   "origin_not_allowed",
   "request_too_large",
   "invalid_form_session",
@@ -68,18 +82,22 @@ assert.ok(endpoint.includes("payload.workflow_problem || payload.follow_up_probl
 for (const phrase of [
   "Managed admin intake",
   "list_tad_applications",
-  "Create {departmentLabel} workspace",
-  "Operational records never enter this public intake queue",
+  "Confirm payment and scope",
+  "Commercial gate complete",
+  "Commercial gate incomplete",
+  "payment_status",
+  "payment_reference",
+  "scope_accepted",
+  "Create {label} workspace",
   "qualification_notes",
   "commercial_decision",
-  "DEPARTMENT_LABELS",
-  "OFFER_PATHS",
 ]) {
   assert.ok(page.includes(phrase), `operator inbox must include ${phrase}`);
 }
 
 assert.ok(actions.includes("update_tad_application"), "review action must use the audited RPC");
+assert.ok(actions.includes("confirm_tad_application_commercial_gate"), "commercial gate must use the audited RPC");
 assert.ok(actions.includes("start_tad_application_onboarding"), "onboarding action must use the audited RPC");
 assert.ok(layout.includes('href="/ops/applications"'), "operator navigation must link to applications");
 
-console.log("Multi-department TAD application pipeline contract passed.");
+console.log("Multi-department TAD application and commercial gate contract passed.");
