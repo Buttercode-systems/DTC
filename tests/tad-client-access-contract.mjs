@@ -24,16 +24,8 @@ for (const phrase of [
   assert.ok(migration.includes(phrase), `client access migration must include ${phrase}`);
 }
 
-assert.equal(
-  migration.includes("p_business_id"),
-  false,
-  "client access must never accept a business id from the browser"
-);
-assert.equal(
-  migration.includes("p_email"),
-  false,
-  "client access must derive the verified email from auth.users"
-);
+assert.equal(migration.includes("p_business_id"), false, "client access must never accept a business id from the browser");
+assert.equal(migration.includes("p_email"), false, "client access must derive the verified email from auth.users");
 assert.ok(
   migration.includes("when public.business_memberships.role in ('owner', 'operator')"),
   "claiming access must not downgrade privileged existing memberships"
@@ -42,8 +34,7 @@ assert.ok(
 assert.ok(portal.includes('supabase.rpc("claim_tad_client_access")'));
 assert.ok(portal.includes('redirect("/login?next=/portal")'));
 assert.ok(
-  portal.indexOf('supabase.rpc("claim_tad_client_access")') <
-    portal.indexOf('const { business } = await requireBusiness()'),
+  portal.indexOf('supabase.rpc("claim_tad_client_access")') < portal.indexOf('const { business } = await requireBusiness()'),
   "verified access must be claimed before requireBusiness can provision a standalone workspace"
 );
 
@@ -54,21 +45,23 @@ for (const phrase of [
   "initialEmail",
   "initialBusiness",
   "tadMode",
+  "product",
 ]) {
   assert.ok(signupPage.includes(phrase), `TAD signup page must include ${phrase}`);
 }
-for (const phrase of ["name=\"next\"", "name=\"tad_mode\"", "Activate Client Portal"]) {
+for (const phrase of ["name=\"next\"", "name=\"tad_mode\"", "name=\"product\"", "Activate Client Portal"]) {
   assert.ok(signupForm.includes(phrase), `TAD signup form must include ${phrase}`);
 }
 for (const phrase of [
   "emailRedirectTo",
-  "/auth/callback?next=/portal",
+  'confirmedDestination = tadMode',
   'supabase.rpc("claim_tad_client_access")',
   "No managed TAD workspace matches this email address",
   "redirect(next.startsWith(\"/portal\") ? next : \"/portal\")",
 ]) {
   assert.ok(signupActions.includes(phrase), `TAD signup action must include ${phrase}`);
 }
+assert.ok(signupActions.includes('tadMode\n    ? "/portal"'), "managed activation must confirm back to the portal");
 assert.ok(callback.includes("safeNext"), "confirmation callback must preserve safe role-aware redirects");
 
 console.log("TAD verified client activation and workspace isolation contract passed.");
