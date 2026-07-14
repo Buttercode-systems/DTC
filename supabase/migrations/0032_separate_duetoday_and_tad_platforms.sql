@@ -67,6 +67,30 @@ create trigger workspace_subscriptions_require_tad_workspace
 before insert or update of business_id on public.workspace_subscriptions
 for each row execute function public.enforce_tad_workspace_resource();
 
+create or replace function public.get_business_platform(p_business_id uuid)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+stable
+as $$
+declare
+  v_platform_key text;
+begin
+  if auth.uid() is null then raise exception 'not authenticated'; end if;
+  if not public.can_access_business(p_business_id,auth.uid()) then
+    raise exception 'business not accessible';
+  end if;
+
+  select b.platform_key into v_platform_key
+  from public.businesses b
+  where b.id = p_business_id;
+
+  if v_platform_key is null then raise exception 'business not found'; end if;
+  return v_platform_key;
+end;
+$$;
+
 create or replace function public.set_business_platform(
   p_business_id uuid,
   p_platform_key text
@@ -99,4 +123,5 @@ begin
 end;
 $$;
 
+grant execute on function public.get_business_platform(uuid) to authenticated;
 grant execute on function public.set_business_platform(uuid,text) to authenticated;
