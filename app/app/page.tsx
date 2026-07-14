@@ -1,10 +1,18 @@
 import Link from "next/link";
-import { requireBusiness } from "@/lib/db";
-import { longDate } from "@/lib/format";
+import { requireBusiness, type Business } from "@/lib/db";
+import { runEngine } from "@/lib/engine";
+import { isoDate, longDate } from "@/lib/format";
 import { trackEvent } from "@/lib/analytics";
+import { TodayList, type TodayAction } from "@/components/TodayList";
+import { FirstTodaySetup } from "@/components/FirstTodaySetup";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Today — The Admin Department" };
+
+export async function generateMetadata() {
+  const { business } = await requireBusiness();
+  return { title: business.platform_key === "tad" ? "Today — The Admin Department" : "Today — DueToday" };
+}
 
 type UnifiedItem = {
   id: string;
@@ -44,6 +52,69 @@ export default async function TodayPage() {
   const { supabase, business } = await requireBusiness();
   await trackEvent(supabase, "app_opened", { businessId: business.id, path: "/app" });
 
+  return business.platform_key === "tad"
+    ? <TadToday supabase={supabase} business={business} />
+    : <DueTodayToday supabase={supabase} business={business} />;
+}
+
+async function DueTodayToday({ supabase, business }: { supabase: SupabaseClient; business: Business }) {
+  await runEngine(supabase, business.id, business.settings);
+
+  const todayIso = isoDate();
+  const [openResult, doneResult] = await Promise.all([
+    supabase
+      .from("actions")
+      .select("id, kind, title, detail, priority, contact_phone, due_date, entity_id, entity_table")
+      .eq("business_id", business.id)
+      .eq("status", "open")
+      .lte("due_date", todayIso)
+      .order("priority", { ascending: false }),
+    supabase
+      .from("actions")
+      .select("id, title")
+      .eq("business_id", business.id)
+      .eq("status", "done")
+      .gte("completed_at", todayIso + "T00:00:00")
+      .order("completed_at", { ascending: false }),
+  ]);
+  if (openResult.error) throw new Error(`Could not load today's actions: ${openResult.error.message}`);
+  if (doneResult.error) throw new Error(`Could not load completed actions: ${doneResult.error.message}`);
+
+  const actions = (openResult.data ?? []) as TodayAction[];
+  const money = actions.filter((action) =>
+    ["invoice_chase", "promise_check", "quote_followup", "quote_expired", "recurring_invoice"].includes(action.kind)
+  ).length;
+  const leads = actions.filter((action) => action.kind === "lead_response").length;
+  const hasOpenActions = actions.length > 0;
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <span className="stamp text-2xl md:text-3xl">Today</span>
+          <p className="mt-3 font-mono text-xs text-faint">{longDate()}</p>
+        </div>
+        <p className="font-mono text-sm text-faint text-right">
+          {actions.length} action{actions.length === 1 ? "" : "s"}
+          {money > 0 && ` · ${money} about money`}
+          {leads > 0 && ` · ${leads} lead${leads === 1 ? "" : "s"} waiting`}
+        </p>
+      </div>
+
+      {!hasOpenActions && (
+        <div className="mt-6">
+          <FirstTodaySetup quoteFollowupDays={business.settings.quote_followup_days} />
+        </div>
+      )}
+
+      <div className="mt-6">
+        <TodayList actions={actions} doneToday={doneResult.data ?? []} showTrackingHint={!hasOpenActions} />
+      </div>
+    </div>
+  );
+}
+
+async function TadToday({ supabase, business }: { supabase: SupabaseClient; business: Business }) {
   const { data, error } = await supabase.rpc("get_tad_unified_today", {
     p_business_id: business.id,
   });
