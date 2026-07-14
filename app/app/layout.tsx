@@ -8,6 +8,7 @@ import { BusinessSwitcher } from "@/components/BusinessSwitcher";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { business, businesses } = await requireBusiness();
   const managed = business.managed_by_tad;
+  const tadWorkspace = business.platform_key === "tad";
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
@@ -15,16 +16,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="mx-auto max-w-6xl px-4 sm:px-5 py-3 flex items-center justify-between gap-3 min-w-0">
           <div className="flex items-center gap-6 min-w-0">
             <Link href={managed ? "/app/service" : "/app"} className="font-display text-lg tracking-tight shrink-0">
-              {managed ? (
+              {tadWorkspace ? (
                 <span className="inline-flex items-baseline gap-2">
                   <span>The Admin <span className="text-ledger">Department</span></span>
-                  <span className="hidden lg:inline font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-faint">Client Portal</span>
+                  <span className="hidden lg:inline font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-faint">
+                    {managed ? "Client Portal" : "TAD SaaS"}
+                  </span>
                 </span>
               ) : (
                 <>Due<span className="text-ledger">Today</span></>
               )}
             </Link>
-            <div className="hidden sm:block min-w-0"><NavLinks managedByTad={managed} /></div>
+            <div className="hidden sm:block min-w-0">
+              <NavLinks managedByTad={managed} platform={business.platform_key} />
+            </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <BusinessSwitcher businesses={businesses} activeBusinessId={business.id} />
@@ -32,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
         <div className="sm:hidden border-t border-rule px-4 py-2 overflow-x-auto [scrollbar-width:none]">
-          <NavLinks managedByTad={managed} />
+          <NavLinks managedByTad={managed} platform={business.platform_key} />
         </div>
       </header>
       <main className="mx-auto max-w-6xl w-full px-4 sm:px-5 py-5 sm:py-8 flex-1 min-w-0">
@@ -43,7 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         )}
         {children}
-        {!managed && <FeedbackForm businessName={business.name} />}
+        {business.platform_key === "duetoday" && <FeedbackForm businessName={business.name} />}
       </main>
     </div>
   );
