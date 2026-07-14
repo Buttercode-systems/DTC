@@ -1,4 +1,3 @@
-import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import type { BusinessSettings } from "@/lib/engine";
@@ -28,7 +27,7 @@ export async function listAccessibleBusinesses(
   );
 }
 
-export const requireBusiness = cache(async function requireBusinessCached(): Promise<{
+export async function requireBusiness(): Promise<{
   supabase: SupabaseClient;
   business: Business;
   businesses: AccessibleBusiness[];
@@ -39,14 +38,7 @@ export const requireBusiness = cache(async function requireBusinessCached(): Pro
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  let [businesses, preferenceResult] = await Promise.all([
-    listAccessibleBusinesses(supabase),
-    supabase
-      .from("user_preferences")
-      .select("active_business_id")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-  ]);
+  let businesses = await listAccessibleBusinesses(supabase);
 
   if (businesses.length === 0) {
     const { data: operator, error: operatorError } = await supabase.rpc(
@@ -74,31 +66,46 @@ export const requireBusiness = cache(async function requireBusinessCached(): Pro
     if (provisionError) {
       throw new Error(`Could not provision your business: ${provisionError.message}`);
     }
-
-    [businesses, preferenceResult] = await Promise.all([
-      listAccessibleBusinesses(supabase),
-      supabase
-        .from("user_preferences")
-        .select("active_business_id")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-    ]);
+    businesses = await listAccessibleBusinesses(supabase);
   }
 
-  if (preferenceResult.error) {
-    throw new Error(`Could not load workspace preference: ${preferenceResult.error.message}`);
+  const { data: preference, error: preferenceError } = await supabase
+    .from("user_preferences")
+    .select("active_business_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (preferenceError) {
+    throw new Error(`Could not load workspace preference: ${preferenceError.message}`);
   }
 
-  const preferredId = preferenceResult.data?.active_business_id as string | null | undefined;
-  const business = businesses.find((candidate) => candidate.id === preferredId) ?? businesses[0];
-  if (!business) redirect("/operator");
+  const preferredId = preference?.active_business_id as string | null | undefined;
+  const selected =
+    businesses.find((candidate) => candidate.id === preferredId) ?? businesses[0];
 
-  if (preferredId !== business.id) {
+  if (!selected) redirect("/operator");
+
+  if (preferredId !== selected.id) {
     const { error: setError } = await supabase.rpc("set_active_business", {
-      p_business_id: business.id,
+      p_business_id: selected.id,
     });
     if (setError) throw new Error(`Could not select workspace: ${setError.message}`);
   }
 
+  const { data: platform, error: platformError } = await supabase.rpc(
+    "get_business_platform",
+    { p_business_id: selected.id }
+  );
+  if (platformError) {
+    throw new Error(`Could not resolve workspace platform: ${platformError.message}`);
+  }
+
+  const business: Business = {
+    ...selected,
+    platform_key: platform === "tad" ? "tad" : "duetoday",
+  };
+  businesses = businesses.map((candidate) =>
+    candidate.id === business.id ? business : candidate
+  );
+
   return { supabase, business, businesses };
-});
+}
