@@ -37,6 +37,12 @@ assert.ok(
   portal.indexOf('supabase.rpc("claim_tad_client_access")') < portal.indexOf('const { business } = await requireBusiness()'),
   "verified access must be claimed before requireBusiness can provision a standalone workspace"
 );
+assert.ok(portal.includes('supabase.rpc("set_business_platform"'), "managed activation must classify the workspace as TAD");
+assert.ok(portal.includes('p_platform_key: "tad"'), "managed activation must use the TAD platform key");
+assert.ok(
+  portal.indexOf('supabase.rpc("set_business_platform"') < portal.indexOf('supabase.rpc("activate_all_tad_departments"'),
+  "the product boundary must be set before managed departments are activated"
+);
 
 for (const phrase of [
   "Activate your Client Portal",
