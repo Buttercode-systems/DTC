@@ -4,6 +4,7 @@ import { signOut } from "@/app/signup/actions";
 import { NavLinks } from "@/components/NavLinks";
 import { FeedbackForm } from "@/components/FeedbackForm";
 import { BusinessSwitcher } from "@/components/BusinessSwitcher";
+import { DtcProgressiveGuidance } from "@/components/DtcProgressiveGuidance";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { business, businesses } = await requireBusiness();
@@ -46,6 +47,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div><strong>{business.name}</strong><span className="text-faint"> · Managed by The Admin Department</span></div>
             <a href="https://the-admin-department.vercel.app" className="font-semibold text-ledger hover:underline">Public service site</a>
           </div>
+        )}
+        {business.platform_key === "duetoday" && (
+          <DtcProgressiveGuidance businessId={business.id} />
         )}
         {children}
         {business.platform_key === "duetoday" && <FeedbackForm businessName={business.name} />}
