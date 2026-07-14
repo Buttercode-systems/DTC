@@ -54,7 +54,7 @@ await rpc(dueToday, 'provision_my_business', { p_business_name: 'DueToday Bounda
 const dueTodayBusinesses = await rpc(dueToday, 'list_accessible_businesses');
 assert.equal(dueTodayBusinesses.length, 1);
 const dueTodayBusinessId = dueTodayBusinesses[0].id;
-assert.equal(dueTodayBusinesses[0].platform_key, 'duetoday');
+assert.equal(await rpc(dueToday, 'get_business_platform', { p_business_id: dueTodayBusinessId }), 'duetoday');
 const { count: dueTodayEngagements, error: dueTodayEngagementError } = await dueToday
   .from('service_engagements')
   .select('id', { count: 'exact', head: true })
@@ -67,6 +67,7 @@ const { count: dueTodaySubscriptions, error: dueTodaySubscriptionError } = await
   .eq('business_id', dueTodayBusinessId);
 assert.ifError(dueTodaySubscriptionError);
 assert.equal(dueTodaySubscriptions, 0);
+await rpcFails(outsider, 'get_business_platform', { p_business_id: dueTodayBusinessId }, /business not accessible/i);
 
 // TAD SaaS is an explicit product choice, followed by six-department activation.
 await rpc(owner, 'provision_my_business', { p_business_name: 'Dual Mode Test', p_assessment_token: null });
@@ -74,6 +75,7 @@ const ownerBusinesses = await rpc(owner, 'list_accessible_businesses');
 assert.equal(ownerBusinesses.length, 1);
 const businessId = ownerBusinesses[0].id;
 assert.equal(await rpc(owner, 'set_business_platform', { p_business_id: businessId, p_platform_key: 'tad' }), 'tad');
+assert.equal(await rpc(owner, 'get_business_platform', { p_business_id: businessId }), 'tad');
 
 const activation = await rpc(owner, 'activate_all_tad_departments', { p_business_id: businessId, p_delivery_mode: 'self_service' });
 assert.equal(activation.departments.length, 6);
@@ -160,6 +162,7 @@ const viewerToday = await rpc(viewer, 'get_tad_unified_today', { p_business_id: 
 assert.ok(viewerToday.items.length >= 3);
 assert.deepEqual(await rpc(outsider, 'list_accessible_businesses'), []);
 await rpcFails(outsider, 'get_tad_department_center', { p_business_id: businessId }, /business not accessible/i);
+await rpcFails(outsider, 'get_business_platform', { p_business_id: businessId }, /business not accessible/i);
 
 const team = await rpc(owner, 'get_workspace_team', { p_business_id: businessId });
 assert.ok(team.members.some((member) => member.user_id === ownerUser.id));
@@ -172,6 +175,7 @@ assert.equal(complete.active_departments, 6);
 console.log(JSON.stringify({
   result: 'passed',
   dueTodaySeparated: true,
+  securePlatformLookup: true,
   allDepartments: 6,
   selfService: true,
   managed: true,
