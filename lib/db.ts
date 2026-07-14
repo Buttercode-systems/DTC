@@ -91,18 +91,17 @@ export async function requireBusiness(): Promise<{
     if (setError) throw new Error(`Could not select workspace: ${setError.message}`);
   }
 
-  const { data: platform, error: platformError } = await supabase
-    .from("businesses")
-    .select("platform_key")
-    .eq("id", selected.id)
-    .single();
+  const { data: platform, error: platformError } = await supabase.rpc(
+    "get_business_platform",
+    { p_business_id: selected.id }
+  );
   if (platformError) {
     throw new Error(`Could not resolve workspace platform: ${platformError.message}`);
   }
 
   const business: Business = {
     ...selected,
-    platform_key: platform.platform_key === "tad" ? "tad" : "duetoday",
+    platform_key: platform === "tad" ? "tad" : "duetoday",
   };
   businesses = businesses.map((candidate) =>
     candidate.id === business.id ? business : candidate
