@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireBusiness } from "@/lib/db";
+import { assertTadPlatform } from "@/lib/platform";
 
 const DEPARTMENTS = new Set(["invoice", "sales", "client", "property", "practice", "member"]);
 const MODES = new Set(["self_service", "managed"]);
@@ -21,6 +22,7 @@ function readMode(formData: FormData): string {
 
 export async function activateAllDepartments(formData: FormData): Promise<void> {
   const { supabase, business } = await requireBusiness();
+  assertTadPlatform(business.platform_key);
   const mode = readMode(formData);
   const { error } = await supabase.rpc("activate_all_tad_departments", {
     p_business_id: business.id,
@@ -34,6 +36,7 @@ export async function activateAllDepartments(formData: FormData): Promise<void> 
 
 export async function activateDepartment(formData: FormData): Promise<void> {
   const { supabase, business } = await requireBusiness();
+  assertTadPlatform(business.platform_key);
   const department = readDepartment(formData);
   const mode = readMode(formData);
   const { error } = await supabase.rpc("activate_tad_department", {
@@ -48,6 +51,7 @@ export async function activateDepartment(formData: FormData): Promise<void> {
 
 export async function updateDepartmentMode(formData: FormData): Promise<void> {
   const { supabase, business } = await requireBusiness();
+  assertTadPlatform(business.platform_key);
   const department = readDepartment(formData);
   const mode = readMode(formData);
   const enabled = String(formData.get("enabled") ?? "true") === "true";
