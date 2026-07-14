@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireBusiness } from "@/lib/db";
+import { requireTadBusiness } from "@/lib/platform";
 import { ApprovalSection } from "@/components/service-desk/ApprovalSection";
 import { ReportSection } from "@/components/service-desk/ReportSection";
 import { SummaryCard } from "@/components/service-desk/Shared";
@@ -30,7 +30,7 @@ type Today = {
 };
 
 export default async function ServiceDeskPage() {
-  const { supabase, business } = await requireBusiness();
+  const { supabase, business } = await requireTadBusiness();
   const [centerResult, todayResult, approvalsResult, reportsResult, manageResult] = await Promise.all([
     supabase.rpc("get_tad_department_center", { p_business_id: business.id }),
     supabase.rpc("get_tad_unified_today", { p_business_id: business.id }),
