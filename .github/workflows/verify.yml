@@ -33,5 +33,7 @@ jobs:
         run: npm run test:pilot
       - name: TAD application pipeline contract
         run: npm run test:intake
+      - name: DueToday and TAD platform boundary contract
+        run: npm run test:platform-boundary
       - name: Production build
         run: npm run build

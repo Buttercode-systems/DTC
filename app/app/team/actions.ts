@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireBusiness } from "@/lib/db";
+import { assertTadPlatform } from "@/lib/platform";
 
 const ROLES = new Set(["manager", "member", "viewer"]);
 
@@ -12,6 +13,7 @@ function text(formData: FormData, key: string, max = 500): string {
 
 export async function createInvitation(formData: FormData): Promise<void> {
   const { supabase, business } = await requireBusiness();
+  assertTadPlatform(business.platform_key);
   const email = text(formData, "email", 320).toLowerCase();
   const role = text(formData, "role", 30);
   if (!email || !ROLES.has(role)) throw new Error("A valid email and role are required");
@@ -28,7 +30,8 @@ export async function createInvitation(formData: FormData): Promise<void> {
 }
 
 export async function revokeInvitation(formData: FormData): Promise<void> {
-  const { supabase } = await requireBusiness();
+  const { supabase, business } = await requireBusiness();
+  assertTadPlatform(business.platform_key);
   const invitationId = text(formData, "invitation_id", 80);
   const { error } = await supabase.rpc("revoke_workspace_invitation", {
     p_invitation_id: invitationId,
@@ -39,6 +42,7 @@ export async function revokeInvitation(formData: FormData): Promise<void> {
 
 export async function updateMember(formData: FormData): Promise<void> {
   const { supabase, business } = await requireBusiness();
+  assertTadPlatform(business.platform_key);
   const userId = text(formData, "user_id", 80);
   const role = text(formData, "role", 30);
   const active = text(formData, "active", 10) === "true";

@@ -23,8 +23,10 @@ export async function signUp(
   const password = String(formData.get("password") ?? "");
   const businessName = String(formData.get("business_name") ?? "").trim();
   const assessmentToken = String(formData.get("assessment") ?? "").trim();
-  const next = safeNext(String(formData.get("next") ?? "/app"));
+  const requestedProduct = String(formData.get("product") ?? "duetoday") === "tad" ? "tad" : "duetoday";
+  const next = safeNext(String(formData.get("next") ?? (requestedProduct === "tad" ? "/app/departments" : "/app")));
   const tadMode = String(formData.get("tad_mode") ?? "0") === "1" || next.startsWith("/portal");
+  const product: "duetoday" | "tad" = tadMode ? "tad" : requestedProduct;
 
   if (!email || password.length < 8 || !businessName) {
     return {
@@ -40,20 +42,24 @@ export async function signUp(
   const supabase = createSupabaseServer();
   await trackPublicEvent(supabase, "signup_started", {
     path: "/signup",
-    metadata: { has_assessment: Boolean(assessmentToken), tad_mode: tadMode },
+    metadata: { has_assessment: Boolean(assessmentToken), tad_mode: tadMode, product },
   });
 
+  const confirmedDestination = tadMode
+    ? "/portal"
+    : product === "tad"
+      ? "/app/departments"
+      : "/app";
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: tadMode
-        ? `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://due-today-six.vercel.app"}/auth/callback?next=/portal`
-        : `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://due-today-six.vercel.app"}/auth/callback?next=/app/departments`,
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "https://due-today-six.vercel.app"}/auth/callback?next=${confirmedDestination}`,
       data: {
         business_name: businessName.slice(0, 200),
         assessment_token: assessmentToken.slice(0, 64),
         tad_client_activation: tadMode,
+        product,
       },
     },
   });
@@ -65,6 +71,7 @@ export async function signUp(
       has_session: Boolean(data.session),
       has_assessment: Boolean(assessmentToken),
       tad_mode: tadMode,
+      product,
     },
   });
 
@@ -72,7 +79,9 @@ export async function signUp(
     return {
       notice: tadMode
         ? "Check your email to confirm your account, then sign in to the TAD Client Portal with this same email address."
-        : "Check your email to confirm your account. All six TAD departments will be ready when you sign in.",
+        : product === "tad"
+          ? "Check your email to confirm your account. Your six TAD departments will be prepared when you sign in."
+          : "Check your email to confirm your DueToday account, then open your Today list.",
     };
   }
 
@@ -100,13 +109,22 @@ export async function signUp(
   const business = (businesses as Array<{ id: string }> | null)?.[0];
   if (!business) return { error: "Workspace creation completed without an accessible business." };
 
-  const { error: activateError } = await supabase.rpc("activate_all_tad_departments", {
+  const { error: platformError } = await supabase.rpc("set_business_platform", {
     p_business_id: business.id,
-    p_delivery_mode: "self_service",
+    p_platform_key: product,
   });
-  if (activateError) return { error: `Workspace created but departments could not be activated: ${activateError.message}` };
+  if (platformError) return { error: `Workspace created but the product could not be selected: ${platformError.message}` };
 
-  redirect(next === "/app" ? "/app/departments" : next);
+  if (product === "tad") {
+    const { error: activateError } = await supabase.rpc("activate_all_tad_departments", {
+      p_business_id: business.id,
+      p_delivery_mode: "self_service",
+    });
+    if (activateError) return { error: `Workspace created but departments could not be activated: ${activateError.message}` };
+    redirect(next === "/app" ? "/app/departments" : next);
+  }
+
+  redirect(next.startsWith("/app/departments") ? "/app" : next);
 }
 
 export async function signIn(

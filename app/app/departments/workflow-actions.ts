@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireBusiness } from "@/lib/db";
+import { assertTadPlatform } from "@/lib/platform";
 
 const DEPARTMENTS = new Set(["invoice", "sales", "client", "property", "practice", "member"]);
 
@@ -39,6 +40,7 @@ function refresh(departmentKey: string): void {
 
 export async function createDepartmentRecord(formData: FormData): Promise<void> {
   const { supabase, business } = await requireBusiness();
+  assertTadPlatform(business.platform_key);
   const departmentKey = department(formData);
   const engagementId = text(formData, "engagement_id", 80);
   const title = text(formData, "title", 240);
@@ -68,6 +70,7 @@ export async function createDepartmentRecord(formData: FormData): Promise<void> 
 
 export async function updateDepartmentRecord(formData: FormData): Promise<void> {
   const { supabase, business } = await requireBusiness();
+  assertTadPlatform(business.platform_key);
   const departmentKey = department(formData);
   const workItemId = text(formData, "work_item_id", 80);
   const status = text(formData, "status", 120);

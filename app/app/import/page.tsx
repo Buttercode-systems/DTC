@@ -1,9 +1,12 @@
 import Link from "next/link";
-import { requireBusiness } from "@/lib/db";
+import { requireBusiness, type Business } from "@/lib/db";
+import { money } from "@/lib/format";
+import { ImportWorkbench } from "@/components/ImportWorkbench";
+import type { ImportKind } from "@/lib/import-money";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { importDepartmentCsv } from "./actions";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Imports — The Admin Department" };
 
 const DEPARTMENTS = [
   ["invoice", "Invoice Admin"],
@@ -14,13 +17,98 @@ const DEPARTMENTS = [
   ["member", "Member Admin"],
 ] as const;
 
-export default async function ImportPage({
+type SearchParams = {
+  type?: string;
+  department?: string;
+  imported?: string;
+  skipped?: string;
+  amount?: string;
+  error?: string;
+  batch?: string;
+};
+
+export default async function ImportPage({ searchParams }: { searchParams: SearchParams }) {
+  const { supabase, business } = await requireBusiness();
+  return business.platform_key === "tad"
+    ? <TadImportPage supabase={supabase} business={business} searchParams={searchParams} />
+    : <DueTodayImportPage supabase={supabase} business={business} searchParams={searchParams} />;
+}
+
+async function DueTodayImportPage({
+  supabase,
+  business,
   searchParams,
 }: {
-  searchParams: { department?: string; imported?: string; skipped?: string; batch?: string };
+  supabase: SupabaseClient;
+  business: Business;
+  searchParams: SearchParams;
 }) {
-  const { supabase, business } = await requireBusiness();
-  const [{ data: engagements }, { data: batches, error: batchError }] = await Promise.all([
+  const [quoteResult, invoiceResult] = await Promise.all([
+    supabase.from("quotes").select("id", { count: "exact", head: true }).eq("business_id", business.id).eq("status", "sent"),
+    supabase.from("invoices").select("id", { count: "exact", head: true }).eq("business_id", business.id).eq("kind", "customer").eq("status", "sent"),
+  ]);
+  if (quoteResult.error) throw new Error(`Could not count quotes: ${quoteResult.error.message}`);
+  if (invoiceResult.error) throw new Error(`Could not count invoices: ${invoiceResult.error.message}`);
+
+  const kind: ImportKind = searchParams.type === "invoices" ? "invoices" : "quotes";
+  const imported = Number(searchParams.imported ?? "");
+  const skipped = Number(searchParams.skipped ?? "");
+  const amount = Number(searchParams.amount ?? "");
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="eyebrow mb-2">DueToday data intake</p>
+          <h1 className="font-display text-3xl">Import money items</h1>
+          <p className="mt-2 text-faint max-w-2xl">
+            Paste open quotes or unpaid invoices from a spreadsheet. DueToday previews the rows, saves valid records, then runs the engine so Today shows what must be chased.
+          </p>
+        </div>
+        <Link href="/app" className="btn-secondary !py-2 text-sm">Open Today →</Link>
+      </div>
+
+      {Number.isFinite(imported) && searchParams.imported !== undefined && (
+        <div className="border border-ledger bg-ledger-tint p-4">
+          <p className="font-semibold">
+            Imported {imported} {kind === "quotes" ? "quote" : "invoice"}{imported === 1 ? "" : "s"}
+            {Number.isFinite(amount) && amount > 0 ? ` · ${money(amount)} tracked` : ""}.
+          </p>
+          <p className="mt-1 text-sm text-faint">
+            {skipped || 0} duplicate or invalid row{skipped === 1 ? "" : "s"} skipped. The Today engine has already run.
+          </p>
+          <Link href="/app" className="inline-block mt-3 text-sm font-semibold text-ledger hover:underline">Open Today list →</Link>
+        </div>
+      )}
+
+      {searchParams.error === "no_valid_rows" && (
+        <div className="border border-stuck bg-card p-4 text-sm text-stuck">
+          No valid rows were found. Check that required columns are present and preview rows show “Ready”.
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="Open quotes tracked" value={quoteResult.count ?? 0} />
+        <Stat label="Unpaid invoices tracked" value={invoiceResult.count ?? 0} />
+        <Stat label="Import limit" value="100 rows" />
+        <Stat label="Auto-send" value="Off" />
+      </div>
+
+      <ImportWorkbench initialKind={kind} />
+    </div>
+  );
+}
+
+async function TadImportPage({
+  supabase,
+  business,
+  searchParams,
+}: {
+  supabase: SupabaseClient;
+  business: Business;
+  searchParams: SearchParams;
+}) {
+  const [engagementResult, batchResult] = await Promise.all([
     supabase
       .from("service_engagements")
       .select("department,enabled,delivery_mode")
@@ -33,9 +121,10 @@ export default async function ImportPage({
       .order("created_at", { ascending: false })
       .limit(20),
   ]);
-  if (batchError) throw new Error(`Could not load import history: ${batchError.message}`);
+  if (engagementResult.error) throw new Error(`Could not load departments: ${engagementResult.error.message}`);
+  if (batchResult.error) throw new Error(`Could not load import history: ${batchResult.error.message}`);
 
-  const active = new Set((engagements ?? []).filter((item) => item.enabled).map((item) => item.department));
+  const active = new Set((engagementResult.data ?? []).filter((item) => item.enabled).map((item) => item.department));
   const imported = Number(searchParams.imported ?? "");
   const skipped = Number(searchParams.skipped ?? "");
 
@@ -76,9 +165,7 @@ export default async function ImportPage({
               Department
               <select name="department" required className="field mt-1" defaultValue={searchParams.department ?? "sales"}>
                 {DEPARTMENTS.map(([key, label]) => (
-                  <option key={key} value={key} disabled={!active.has(key)}>
-                    {label}{active.has(key) ? "" : " — activate first"}
-                  </option>
+                  <option key={key} value={key} disabled={!active.has(key)}>{label}{active.has(key) ? "" : " — activate first"}</option>
                 ))}
               </select>
             </label>
@@ -105,7 +192,7 @@ SALE-002,Recover stalled quote,Follow-up due,Lebo,70,Call decision maker,2026-07
       <section>
         <p className="eyebrow">Recent imports</p>
         <h2 className="mt-1 font-display text-3xl">Import history</h2>
-        {(batches ?? []).length === 0 ? (
+        {(batchResult.data ?? []).length === 0 ? (
           <div className="mt-4 border border-dashed border-rule bg-card p-6 text-sm text-faint">No department imports yet.</div>
         ) : (
           <div className="mt-4 overflow-x-auto border border-rule bg-card">
@@ -114,15 +201,9 @@ SALE-002,Recover stalled quote,Follow-up due,Lebo,70,Call decision maker,2026-07
                 <tr><th className="p-3">Department</th><th className="p-3">File</th><th className="p-3">Rows</th><th className="p-3">Imported</th><th className="p-3">Skipped</th><th className="p-3">Status</th><th className="p-3">Date</th></tr>
               </thead>
               <tbody>
-                {(batches ?? []).map((batch) => (
+                {(batchResult.data ?? []).map((batch) => (
                   <tr key={batch.id} className="border-b border-rule last:border-0">
-                    <td className="p-3 capitalize">{batch.department}</td>
-                    <td className="p-3">{batch.filename || "import.csv"}</td>
-                    <td className="p-3">{batch.row_count}</td>
-                    <td className="p-3">{batch.imported_count}</td>
-                    <td className="p-3">{batch.skipped_count}</td>
-                    <td className="p-3 capitalize">{batch.status}</td>
-                    <td className="p-3">{new Date(batch.created_at).toLocaleString("en-ZA")}</td>
+                    <td className="p-3 capitalize">{batch.department}</td><td className="p-3">{batch.filename || "import.csv"}</td><td className="p-3">{batch.row_count}</td><td className="p-3">{batch.imported_count}</td><td className="p-3">{batch.skipped_count}</td><td className="p-3 capitalize">{batch.status}</td><td className="p-3">{new Date(batch.created_at).toLocaleString("en-ZA")}</td>
                   </tr>
                 ))}
               </tbody>
@@ -130,6 +211,15 @@ SALE-002,Recover stalled quote,Follow-up due,Lebo,70,Call decision maker,2026-07
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="bg-card border border-rule p-4">
+      <p className="font-display text-2xl">{value}</p>
+      <p className="font-mono text-[11px] uppercase tracking-wider text-faint">{label}</p>
     </div>
   );
 }

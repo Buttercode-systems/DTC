@@ -9,12 +9,14 @@ export function SignUpForm({
   initialEmail,
   initialBusiness,
   tadMode,
+  product,
 }: {
   assessmentToken: string;
   next: string;
   initialEmail: string;
   initialBusiness: string;
   tadMode: boolean;
+  product: "duetoday" | "tad";
 }) {
   const [state, action] = useFormState<AuthState, FormData>(signUp, {});
   return (
@@ -22,6 +24,7 @@ export function SignUpForm({
       <input type="hidden" name="assessment" value={assessmentToken} />
       <input type="hidden" name="next" value={next} />
       <input type="hidden" name="tad_mode" value={tadMode ? "1" : "0"} />
+      <input type="hidden" name="product" value={product} />
       <input
         name="business_name"
         required
@@ -51,16 +54,21 @@ export function SignUpForm({
           {state.notice}
         </p>
       )}
-      <Submit tadMode={tadMode} />
+      <Submit tadMode={tadMode} product={product} />
     </form>
   );
 }
 
-function Submit({ tadMode }: { tadMode: boolean }) {
+function Submit({ tadMode, product }: { tadMode: boolean; product: "duetoday" | "tad" }) {
   const { pending } = useFormStatus();
+  const label = tadMode
+    ? "Activate Client Portal"
+    : product === "tad"
+      ? "Create my TAD workspace"
+      : "Create my Today list";
   return (
     <button className="btn-primary w-full" disabled={pending}>
-      {pending ? "Setting up…" : tadMode ? "Activate Client Portal" : "Create my Today list"}
+      {pending ? "Setting up…" : label}
     </button>
   );
 }
