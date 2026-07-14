@@ -10,6 +10,14 @@ const signupPage = read("app/signup/page.tsx");
 const nav = read("components/NavLinks.tsx");
 const today = read("app/app/page.tsx");
 const layout = read("app/app/layout.tsx");
+const platform = read("lib/platform.ts");
+const departmentActions = read("app/app/departments/actions.ts");
+const workflowActions = read("app/app/departments/workflow-actions.ts");
+const teamActions = read("app/app/team/actions.ts");
+const importActions = read("app/app/import/actions.ts");
+const importPage = read("app/app/import/page.tsx");
+const servicePage = read("app/app/service/page.tsx");
+const accountPage = read("app/app/account/page.tsx");
 
 assert.match(migration, /platform_key text not null default 'duetoday'/);
 assert.match(migration, /check \(platform_key in \('duetoday','tad'\)\)/);
@@ -36,5 +44,18 @@ assert.match(today, /runEngine/);
 assert.match(today, /get_tad_unified_today/);
 assert.match(layout, /business\.platform_key === "tad"/);
 assert.match(layout, /platform=\{business\.platform_key\}/);
+
+assert.match(platform, /requireTadBusiness/);
+assert.match(platform, /assertTadPlatform/);
+for (const source of [departmentActions, workflowActions, teamActions, importActions]) {
+  assert.match(source, /assertTadPlatform\(business\.platform_key\)/);
+}
+assert.match(servicePage, /requireTadBusiness/);
+assert.match(accountPage, /requireTadBusiness/);
+
+assert.match(importPage, /DueTodayImportPage/);
+assert.match(importPage, /TadImportPage/);
+assert.match(importPage, /ImportWorkbench/);
+assert.match(importPage, /importDepartmentCsv/);
 
 console.log("DTC/TAD platform boundary contract passed");
