@@ -30,11 +30,7 @@ function normalizeRoute(key) {
 
 function resolveRoute(route) {
   if (!route.includes("[")) return route;
-  const explicit = fixtures.routes?.[route];
-  if (!explicit) {
-    throw new Error(`Dynamic page ${route} has no concrete fixture in ${fixturesPath}`);
-  }
-  return explicit;
+  return fixtures.routes?.[route] || null;
 }
 
 const routes = [...new Set(Object.keys(manifest).map(normalizeRoute).filter(Boolean))]
@@ -62,8 +58,14 @@ async function load(pathname) {
 }
 
 const results = [];
+const unresolved = [];
 for (const route of routes) {
   const pathname = resolveRoute(route);
+  if (!pathname) {
+    unresolved.push(route);
+    console.log(`UNRESOLVED ${route} — add a concrete route fixture to ${fixturesPath}`);
+    continue;
+  }
 
   for (let i = 0; i < warmups; i += 1) {
     await load(pathname);
@@ -79,6 +81,7 @@ for (const route of routes) {
     location = sample.location;
   }
 
+  const p95Ms = percentile(timings, 95);
   const result = {
     route,
     pathname,
@@ -86,9 +89,9 @@ for (const route of routes) {
     location,
     samples,
     p50Ms: Number(percentile(timings, 50).toFixed(2)),
-    p95Ms: Number(percentile(timings, 95).toFixed(2)),
+    p95Ms: Number(p95Ms.toFixed(2)),
     maxMs: Number(Math.max(...timings).toFixed(2)),
-    underThreshold: percentile(timings, 95) < thresholdMs,
+    underThreshold: p95Ms < thresholdMs,
   };
   results.push(result);
   console.log(`${result.underThreshold ? "PASS" : "FAIL"} ${pathname} status=${status} p50=${result.p50Ms}ms p95=${result.p95Ms}ms max=${result.maxMs}ms${location ? ` -> ${location}` : ""}`);
@@ -100,7 +103,9 @@ const report = {
   thresholdMs,
   samples,
   warmups,
-  routeCount: results.length,
+  discoveredRouteCount: routes.length,
+  measuredRouteCount: results.length,
+  unresolved,
   failures: results.filter((result) => !result.underThreshold),
   redirects: results.filter((result) => result.status >= 300 && result.status < 400),
   results,
@@ -108,8 +113,8 @@ const report = {
 writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`);
 
 if (report.redirects.length && !cookie) {
-  console.warn(`Measured ${report.redirects.length} redirecting pages without PERF_COOKIE. Authenticated content still requires an authenticated benchmark pass.`);
+  console.warn(`Measured ${report.redirects.length} redirecting pages without PERF_COOKIE. Authenticated content requires a separate authenticated pass.`);
 }
-if (report.failures.length) {
+if (report.failures.length || report.unresolved.length) {
   process.exitCode = 1;
 }
