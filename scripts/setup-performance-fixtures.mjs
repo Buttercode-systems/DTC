@@ -77,7 +77,15 @@ await rpc(tad, "set_tad_department_mode", {
 });
 
 const operator = await signInClient(emails.operator);
-await rpc(operator, "claim_first_tad_operator");
+const operatorCookie = await loginCookie(emails.operator, "/hq");
+const operatorClaim = await fetch(new URL("/hq", baseURL), {
+  headers: { cookie: operatorCookie },
+  redirect: "manual",
+});
+if (![200, 307].includes(operatorClaim.status)) throw new Error(`Operator claim failed with ${operatorClaim.status}`);
+const operatorAllowed = await rpc(operator, "is_current_tad_operator");
+if (!operatorAllowed) throw new Error("Operator claim route did not grant operator access");
+
 const managed = await rpc(operator, "create_managed_business", {
   p_name: "Performance Managed Client",
   p_industry: "services",
@@ -116,14 +124,8 @@ const { token: reportToken } = await assessmentResponse.json();
 const cookies = {
   duetoday: await loginCookie(emails.due, "/app"),
   tad: await loginCookie(emails.tad, "/app"),
-  operator: await loginCookie(emails.operator, "/hq"),
+  operator: operatorCookie,
 };
-
-const operatorClaim = await fetch(new URL("/hq", baseURL), {
-  headers: { cookie: cookies.operator },
-  redirect: "manual",
-});
-if (![200, 307].includes(operatorClaim.status)) throw new Error(`Operator claim failed with ${operatorClaim.status}`);
 
 const fixtures = {
   routes: {
