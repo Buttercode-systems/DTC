@@ -114,8 +114,7 @@ begin
   end if;
 
   update public.businesses
-  set platform_key = p_platform_key,
-      updated_at = now()
+  set platform_key = p_platform_key
   where id = p_business_id;
 
   if not found then raise exception 'business not found'; end if;
