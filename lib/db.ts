@@ -10,6 +10,7 @@ export interface Business {
   settings: BusinessSettings;
   managed_by_tad: boolean;
   service_status: string;
+  platform_key: "duetoday" | "tad";
   delivery_mode?: "self_service" | "managed" | "hybrid";
   onboarding_status?: "not_started" | "in_progress" | "ready" | "complete";
 }
@@ -21,7 +22,9 @@ export async function listAccessibleBusinesses(
 ): Promise<AccessibleBusiness[]> {
   const { data, error } = await supabase.rpc("list_accessible_businesses");
   if (error) throw new Error(`Could not load accessible businesses: ${error.message}`);
-  return (data ?? []) as AccessibleBusiness[];
+  return ((data ?? []) as Array<Omit<AccessibleBusiness, "platform_key"> & { platform_key?: "duetoday" | "tad" }>).map(
+    (business) => ({ ...business, platform_key: business.platform_key ?? "duetoday" })
+  );
 }
 
 export async function requireBusiness(): Promise<{
@@ -64,18 +67,6 @@ export async function requireBusiness(): Promise<{
       throw new Error(`Could not provision your business: ${provisionError.message}`);
     }
     businesses = await listAccessibleBusinesses(supabase);
-
-    const created = businesses[0];
-    if (created) {
-      const { error: activateError } = await supabase.rpc("activate_all_tad_departments", {
-        p_business_id: created.id,
-        p_delivery_mode: "self_service",
-      });
-      if (activateError) {
-        throw new Error(`Could not activate TAD departments: ${activateError.message}`);
-      }
-      businesses = await listAccessibleBusinesses(supabase);
-    }
   }
 
   const { data: preference, error: preferenceError } = await supabase
@@ -88,17 +79,34 @@ export async function requireBusiness(): Promise<{
   }
 
   const preferredId = preference?.active_business_id as string | null | undefined;
-  const business =
+  const selected =
     businesses.find((candidate) => candidate.id === preferredId) ?? businesses[0];
 
-  if (!business) redirect("/operator");
+  if (!selected) redirect("/operator");
 
-  if (preferredId !== business.id) {
+  if (preferredId !== selected.id) {
     const { error: setError } = await supabase.rpc("set_active_business", {
-      p_business_id: business.id,
+      p_business_id: selected.id,
     });
     if (setError) throw new Error(`Could not select workspace: ${setError.message}`);
   }
+
+  const { data: platform, error: platformError } = await supabase
+    .from("businesses")
+    .select("platform_key")
+    .eq("id", selected.id)
+    .single();
+  if (platformError) {
+    throw new Error(`Could not resolve workspace platform: ${platformError.message}`);
+  }
+
+  const business: Business = {
+    ...selected,
+    platform_key: platform.platform_key === "tad" ? "tad" : "duetoday",
+  };
+  businesses = businesses.map((candidate) =>
+    candidate.id === business.id ? business : candidate
+  );
 
   return { supabase, business, businesses };
 }
