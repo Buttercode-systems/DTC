@@ -65,6 +65,14 @@ execFileSync("psql", [
   "-v",
   "ON_ERROR_STOP=1",
   "-c",
+  "grant usage on schema public to anon, authenticated; grant select, insert, update, delete on all tables in schema public to authenticated; grant select on all tables in schema public to anon; grant usage, select on all sequences in schema public to authenticated;",
+], { stdio: "inherit" });
+
+execFileSync("psql", [
+  dbUrl,
+  "-v",
+  "ON_ERROR_STOP=1",
+  "-c",
   `insert into public.platform_operators(user_id, role, active) values ('${operatorUser.id}'::uuid, 'admin', true) on conflict (user_id) do update set role='admin', active=true`,
 ], { stdio: "inherit" });
 
