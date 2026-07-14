@@ -19,7 +19,9 @@ const applications = read("app/ops/applications/page.tsx");
 const operatorBootstrap = read("supabase/migrations/0026_tad_operator_bootstrap_policy.sql");
 
 for (const phrase of [
-  "PLATFORM_LINKS",
+  "DUETODAY_LINKS",
+  "TAD_LINKS",
+  "MANAGED_LINKS",
   'label: "Today"',
   'label: "Departments"',
   'label: "Approvals"',
@@ -28,18 +30,27 @@ for (const phrase of [
   'label: "Team"',
   'label: "Account"',
   'label: "Settings"',
+  'label: "Leads"',
+  'label: "Quotes"',
+  'label: "Invoices"',
   "managedByTad",
   "TAD Managed navigation",
   "TAD SaaS navigation",
+  "DueToday navigation",
 ]) {
-  assert.ok(nav.includes(phrase), `unified navigation must include ${phrase}`);
+  assert.ok(nav.includes(phrase), `product-aware navigation must include ${phrase}`);
 }
-assert.equal(nav.includes("STANDALONE_LINKS"), false, "old split navigation must be removed");
-assert.equal(nav.includes("MANAGED_LINKS"), false, "old managed-only navigation must be removed");
+assert.ok(
+  nav.includes('platform === "tad" ? TAD_LINKS : DUETODAY_LINKS'),
+  "navigation must select links using the active workspace platform"
+);
 
 for (const phrase of [
   "The Admin",
   "Client Portal",
+  "TAD SaaS",
+  "Due",
+  "business.platform_key",
   "managedByTad={managed}",
   "Managed by The Admin Department",
 ]) {
@@ -71,7 +82,7 @@ for (const phrase of [
 ]) {
   assert.ok(middleware.includes(phrase), `middleware must protect ${phrase}`);
 }
-assert.equal(middleware.includes("standaloneOnlyRoutes"), false, "managed users must be allowed into the same platform routes");
+assert.equal(middleware.includes("standaloneOnlyRoutes"), false, "product access is resolved after the active workspace is loaded");
 assert.equal(middleware.includes('url.pathname = "/app/service"'), false, "middleware must not force managed users into one service page");
 
 for (const phrase of ["is_current_tad_operator", 'redirect("/ops")', 'redirect("/app")']) {
@@ -128,4 +139,4 @@ for (const phrase of [
 assert.ok(approvals.includes('id="decisions"'), "Service Desk must expose the decisions anchor");
 assert.ok(reports.includes('id="reports"'), "Service Desk must expose the reports anchor");
 
-console.log("TAD unified SaaS, Managed, Admin HQ and Client Portal contract passed.");
+console.log("TAD SaaS, Managed, Admin HQ and Client Portal contract passed with the DueToday product boundary intact.");
