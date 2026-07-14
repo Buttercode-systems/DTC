@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireBusiness } from "@/lib/db";
+import { requireTadBusiness } from "@/lib/platform";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Account — The Admin Department" };
@@ -22,7 +22,7 @@ type Center = {
 };
 
 export default async function AccountPage() {
-  const { supabase, business } = await requireBusiness();
+  const { supabase, business } = await requireTadBusiness();
   const { data, error } = await supabase.rpc("get_tad_department_center", {
     p_business_id: business.id,
   });
