@@ -1,11 +1,13 @@
 import { mkdirSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 
 const baseURL = process.env.PERF_BASE_URL || "http://127.0.0.1:3000";
 const url = process.env.API_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceKey = process.env.SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !anonKey || !serviceKey) throw new Error("Local Supabase URL, anon key and service-role key are required");
+const dbUrl = process.env.DB_URL;
+if (!url || !anonKey || !serviceKey || !dbUrl) throw new Error("Local Supabase URL, anon key, service-role key and DB URL are required");
 
 const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 const password = "Performance-Only-2026!";
@@ -55,8 +57,16 @@ async function loginCookie(email, next = "/app") {
 
 await createUser(emails.due, "Performance DueToday");
 await createUser(emails.tad, "Performance TAD Hybrid");
-await createUser(emails.operator, "Performance Operator");
+const operatorUser = await createUser(emails.operator, "Performance Operator");
 await createUser(emails.invited, "Performance Invitee");
+
+execFileSync("psql", [
+  dbUrl,
+  "-v",
+  "ON_ERROR_STOP=1",
+  "-c",
+  `insert into public.platform_operators(user_id, role, active) values ('${operatorUser.id}'::uuid, 'admin', true) on conflict (user_id) do update set role='admin', active=true`,
+], { stdio: "inherit" });
 
 const due = await signInClient(emails.due);
 await rpc(due, "provision_my_business", { p_business_name: "Performance DueToday", p_assessment_token: null });
@@ -77,14 +87,9 @@ await rpc(tad, "set_tad_department_mode", {
 });
 
 const operator = await signInClient(emails.operator);
-const operatorCookie = await loginCookie(emails.operator, "/hq");
-const operatorClaim = await fetch(new URL("/hq", baseURL), {
-  headers: { cookie: operatorCookie },
-  redirect: "manual",
-});
-if (![200, 307].includes(operatorClaim.status)) throw new Error(`Operator claim failed with ${operatorClaim.status}`);
 const operatorAllowed = await rpc(operator, "is_current_tad_operator");
-if (!operatorAllowed) throw new Error("Operator claim route did not grant operator access");
+if (!operatorAllowed) throw new Error("Direct local operator seed did not grant access");
+const operatorCookie = await loginCookie(emails.operator, "/hq");
 
 const managed = await rpc(operator, "create_managed_business", {
   p_name: "Performance Managed Client",
