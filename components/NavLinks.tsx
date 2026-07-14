@@ -9,7 +9,19 @@ type NavItem = {
   anchor?: boolean;
 };
 
-const PLATFORM_LINKS: NavItem[] = [
+const DUETODAY_LINKS: NavItem[] = [
+  { href: "/app", label: "Today" },
+  { href: "/app/report", label: "Report" },
+  { href: "/app/pipeline", label: "Pipeline" },
+  { href: "/app/leads", label: "Leads" },
+  { href: "/app/quotes", label: "Quotes" },
+  { href: "/app/invoices", label: "Invoices" },
+  { href: "/app/customers", label: "Customers" },
+  { href: "/app/import", label: "Import" },
+  { href: "/app/settings", label: "Settings" },
+];
+
+const TAD_LINKS: NavItem[] = [
   { href: "/app", label: "Today" },
   { href: "/app/departments", label: "Departments" },
   { href: "/app/service#decisions", label: "Approvals", anchor: true },
@@ -20,15 +32,35 @@ const PLATFORM_LINKS: NavItem[] = [
   { href: "/app/settings", label: "Settings" },
 ];
 
-export function NavLinks({ managedByTad = false }: { managedByTad?: boolean }) {
+const MANAGED_LINKS: NavItem[] = [
+  { href: "/app", label: "Today" },
+  { href: "/app/service", label: "Service Desk" },
+  { href: "/app/service#decisions", label: "Decisions", anchor: true },
+  { href: "/app/service#reports", label: "Reports", anchor: true },
+  { href: "/app/account", label: "Account" },
+];
+
+export function NavLinks({
+  managedByTad = false,
+  platform = "duetoday",
+}: {
+  managedByTad?: boolean;
+  platform?: "duetoday" | "tad";
+}) {
   const pathname = usePathname();
+  const links = managedByTad ? MANAGED_LINKS : platform === "tad" ? TAD_LINKS : DUETODAY_LINKS;
+  const label = managedByTad
+    ? "TAD Managed navigation"
+    : platform === "tad"
+      ? "TAD SaaS navigation"
+      : "DueToday navigation";
 
   return (
     <nav
       className="flex items-center gap-4 text-sm whitespace-nowrap min-w-max sm:min-w-0"
-      aria-label={managedByTad ? "TAD Managed navigation" : "TAD SaaS navigation"}
+      aria-label={label}
     >
-      {PLATFORM_LINKS.map((link) => {
+      {links.map((link) => {
         const active = link.anchor
           ? false
           : link.href === "/app"
