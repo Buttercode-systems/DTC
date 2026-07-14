@@ -11,6 +11,7 @@ const nav = read("components/NavLinks.tsx");
 const today = read("app/app/page.tsx");
 const layout = read("app/app/layout.tsx");
 const platform = read("lib/platform.ts");
+const portal = read("app/portal/page.tsx");
 const departmentActions = read("app/app/departments/actions.ts");
 const workflowActions = read("app/app/departments/workflow-actions.ts");
 const teamActions = read("app/app/team/actions.ts");
@@ -22,6 +23,11 @@ const accountPage = read("app/app/account/page.tsx");
 assert.match(migration, /platform_key text not null default 'duetoday'/);
 assert.match(migration, /check \(platform_key in \('duetoday','tad'\)\)/);
 assert.match(migration, /set_business_platform/);
+assert.match(migration, /enforce_managed_business_platform/);
+assert.match(migration, /service_engagements_require_tad_workspace/);
+assert.match(migration, /workspace_subscriptions_require_tad_workspace/);
+assert.match(migration, /TAD resources require a TAD workspace/);
+assert.match(migration, /remove TAD engagements before changing this workspace to DueToday/);
 
 assert.doesNotMatch(db, /activate_all_tad_departments/);
 assert.match(db, /platform_key: "duetoday" \| "tad"/);
@@ -32,6 +38,8 @@ assert.match(signup, /if \(product === "tad"\)/);
 assert.match(signup, /activate_all_tad_departments/);
 assert.match(signup, /Check your email to confirm your DueToday account/);
 assert.match(signupPage, /product === "tad"/);
+assert.match(portal, /set_business_platform/);
+assert.match(portal, /p_platform_key: "tad"/);
 
 assert.match(nav, /DUETODAY_LINKS/);
 assert.match(nav, /TAD_LINKS/);
