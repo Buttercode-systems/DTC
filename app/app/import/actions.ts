@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireBusiness } from "@/lib/db";
+import { assertTadPlatform } from "@/lib/platform";
 
 const DEPARTMENTS = new Set(["invoice", "sales", "client", "property", "practice", "member"]);
 
@@ -40,6 +41,7 @@ function parseCsv(text: string): string[][] {
 
 export async function importDepartmentCsv(formData: FormData): Promise<void> {
   const { supabase, business } = await requireBusiness();
+  assertTadPlatform(business.platform_key);
   const department = String(formData.get("department") ?? "");
   if (!DEPARTMENTS.has(department)) throw new Error("Invalid department");
 
