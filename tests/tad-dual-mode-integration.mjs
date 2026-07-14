@@ -54,13 +54,7 @@ await rpc(dueToday, 'provision_my_business', { p_business_name: 'DueToday Bounda
 const dueTodayBusinesses = await rpc(dueToday, 'list_accessible_businesses');
 assert.equal(dueTodayBusinesses.length, 1);
 const dueTodayBusinessId = dueTodayBusinesses[0].id;
-const { data: dueTodayBusiness, error: dueTodayBusinessError } = await dueToday
-  .from('businesses')
-  .select('platform_key')
-  .eq('id', dueTodayBusinessId)
-  .single();
-assert.ifError(dueTodayBusinessError);
-assert.equal(dueTodayBusiness.platform_key, 'duetoday');
+assert.equal(dueTodayBusinesses[0].platform_key, 'duetoday');
 const { count: dueTodayEngagements, error: dueTodayEngagementError } = await dueToday
   .from('service_engagements')
   .select('id', { count: 'exact', head: true })
