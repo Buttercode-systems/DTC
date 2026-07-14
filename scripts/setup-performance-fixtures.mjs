@@ -75,11 +75,18 @@ await rpc(tad, "set_tad_department_mode", {
   p_delivery_mode: "managed",
   p_enabled: true,
 });
-const { error: managedError } = await admin
-  .from("businesses")
-  .update({ managed_by_tad: true, service_status: "pilot" })
-  .eq("id", tadBusinessId);
-if (managedError) throw managedError;
+
+const operator = await signInClient(emails.operator);
+await rpc(operator, "claim_first_tad_operator");
+const managed = await rpc(operator, "create_managed_business", {
+  p_name: "Performance Managed Client",
+  p_industry: "services",
+  p_contact_name: "Performance Client",
+  p_contact_email: emails.invited,
+  p_department: "client",
+  p_service_level: "managed",
+});
+const managedBusinessId = managed.business_id;
 
 const invitation = await rpc(tad, "create_workspace_invitation", {
   p_business_id: tadBusinessId,
@@ -116,15 +123,13 @@ const operatorClaim = await fetch(new URL("/hq", baseURL), {
   headers: { cookie: cookies.operator },
   redirect: "manual",
 });
-if (![200, 307].includes(operatorClaim.status)) {
-  throw new Error(`Operator claim failed with ${operatorClaim.status}`);
-}
+if (![200, 307].includes(operatorClaim.status)) throw new Error(`Operator claim failed with ${operatorClaim.status}`);
 
 const fixtures = {
   routes: {
     "/app/departments/[department]": "/app/departments/invoice",
     "/invite/[token]": `/invite/${invitation.token}`,
-    "/ops/client/[businessId]": `/ops/client/${tadBusinessId}`,
+    "/ops/client/[businessId]": `/ops/client/${managedBusinessId}`,
     "/report/[token]": `/report/${reportToken}`,
   },
   profiles: {
@@ -155,9 +160,9 @@ const fixtures = {
   expectedStatuses: {
     "/_not-found": [404]
   },
-  metadata: { dueBusinessId, tadBusinessId },
+  metadata: { dueBusinessId, tadBusinessId, managedBusinessId },
 };
 
 mkdirSync("tests/performance", { recursive: true });
 writeFileSync("tests/performance/generated-fixtures.json", `${JSON.stringify(fixtures, null, 2)}\n`);
-console.log(JSON.stringify({ dueBusinessId, tadBusinessId, reportToken, invitationToken: invitation.token }));
+console.log(JSON.stringify({ dueBusinessId, tadBusinessId, managedBusinessId, reportToken, invitationToken: invitation.token }));
