@@ -1,0 +1,55 @@
+name: Every Page Performance
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://pzvytksdpwnsnixcbrzr.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_a-iMxWAVN1OZDywsf-g99A_o8RgS_na
+      PERF_BASE_URL: http://127.0.0.1:3000
+      PERF_THRESHOLD_MS: 50
+      PERF_SAMPLES: 25
+      PERF_WARMUPS: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build production application
+        run: npm run build
+      - name: Start production server
+        run: |
+          npm run start -- --hostname 127.0.0.1 > /tmp/dtc-performance-server.log 2>&1 &
+          echo $! > /tmp/dtc-performance-server.pid
+      - name: Wait for server
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/dtc-performance-server.log
+          exit 1
+      - name: Benchmark every discovered page
+        run: npm run perf:pages
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: every-page-performance-${{ github.run_id }}
+          path: |
+            performance-results.json
+            /tmp/dtc-performance-server.log
+          if-no-files-found: warn
