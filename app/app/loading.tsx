@@ -1,6 +1,9 @@
 export default function Loading() {
   return (
-    <div className="animate-pulse space-y-6" aria-busy="true" aria-label="Loading">
+    <div className="space-y-6" aria-busy="true" aria-label="Loading">
+      <div className="h-0.5 w-full bg-rule/40">
+        <div className="h-full w-1/3 bg-ledger" />
+      </div>
       <div className="space-y-2">
         <div className="h-7 w-48 bg-rule/60" />
         <div className="h-4 w-72 max-w-full bg-rule/40" />
