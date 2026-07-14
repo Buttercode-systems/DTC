@@ -1,0 +1,97 @@
+name: Every Page Performance
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PERF_BASE_URL: http://127.0.0.1:3000
+      PERF_THRESHOLD_MS: 50
+      PERF_SAMPLES: 25
+      PERF_WARMUPS: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: npm ci
+      - name: Initialize isolated Supabase stack
+        shell: bash
+        run: |
+          if [ ! -f supabase/config.toml ]; then supabase init; fi
+          if [ -f supabase/migrations/0024_tad_application_pipeline.sql ]; then
+            mv supabase/migrations/0024_tad_application_pipeline.sql supabase/migrations/002401_tad_application_pipeline.sql
+          fi
+          supabase start --debug > /tmp/performance-supabase.log 2>&1
+          supabase status -o env > /tmp/performance-supabase.env
+          set -a
+          source /tmp/performance-supabase.env
+          set +a
+          {
+            echo "API_URL=$API_URL"
+            echo "ANON_KEY=$ANON_KEY"
+            echo "SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "DB_URL=$DB_URL"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+      - name: Build production application
+        run: npm run build
+      - name: Start production server
+        run: |
+          npm run start -- --hostname 127.0.0.1 > /tmp/dtc-performance-server.log 2>&1 &
+          echo $! > /tmp/dtc-performance-server.pid
+      - name: Wait for server
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/dtc-performance-server.log
+          exit 1
+      - name: Seed DueToday, TAD, Hybrid and operator fixtures
+        run: npm run perf:fixtures 2>&1 | tee /tmp/performance-fixtures.log
+      - name: Benchmark every discovered page
+        shell: bash
+        run: |
+          set +e
+          npm run perf:pages > /tmp/performance-console.log 2>&1
+          status=$?
+          cp .next/server/app-paths-manifest.json /tmp/app-paths-manifest.json
+          if [ -f performance-results.json ]; then cp performance-results.json /tmp/performance-results.json; fi
+          {
+            echo "exit_status=$status"
+            echo "working_directory=$PWD"
+            echo "fixture_exists=$(test -f tests/performance/generated-fixtures.json && echo yes || echo no)"
+          } > /tmp/performance-diagnostics.txt
+          cat /tmp/performance-console.log
+          exit $status
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: every-page-performance-${{ github.run_id }}
+          path: |
+            /tmp/performance-results.json
+            /tmp/performance-console.log
+            /tmp/performance-fixtures.log
+            /tmp/performance-diagnostics.txt
+            /tmp/app-paths-manifest.json
+            /tmp/dtc-performance-server.log
+            /tmp/performance-supabase.log
+          if-no-files-found: warn
+      - name: Stop isolated Supabase stack
+        if: always()
+        run: supabase stop --no-backup
