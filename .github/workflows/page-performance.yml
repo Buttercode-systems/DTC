@@ -45,16 +45,28 @@ jobs:
       - name: Benchmark every discovered page
         shell: bash
         run: |
-          set -o pipefail
-          npm run perf:pages 2>&1 | tee performance-console.log
+          set +e
+          npm run perf:pages > /tmp/performance-console.log 2>&1
+          status=$?
+          cp .next/server/app-paths-manifest.json /tmp/app-paths-manifest.json
+          if [ -f performance-results.json ]; then cp performance-results.json /tmp/performance-results.json; fi
+          {
+            echo "exit_status=$status"
+            echo "working_directory=$PWD"
+            echo "repo_files:"
+            find . -maxdepth 3 -type f | sort
+          } > /tmp/performance-diagnostics.txt
+          cat /tmp/performance-console.log
+          exit $status
       - name: Upload benchmark evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: every-page-performance-${{ github.run_id }}
           path: |
-            performance-results.json
-            performance-console.log
-            .next/server/app-paths-manifest.json
+            /tmp/performance-results.json
+            /tmp/performance-console.log
+            /tmp/performance-diagnostics.txt
+            /tmp/app-paths-manifest.json
             /tmp/dtc-performance-server.log
           if-no-files-found: warn
